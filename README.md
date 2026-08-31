@@ -119,6 +119,10 @@ LLM_API_KEY=your-key
 LLM_MODEL=your-model
 ```
 
+> **公开部署务必设置 `API_SECRET`。** 未设置时，公开版默认拒绝 `/v1/chat/completions` 请求；只有显式设置 `ALLOW_INSECURE_NO_SECRET=1` 才会允许无鉴权访问，这个选项只适合本地测试。否则一旦服务暴露到公网，任何人都可能直接消耗你的上游模型额度。
+>
+> 浏览器跨域访问默认关闭。确实需要跨域时再设置 `CORS_ALLOW_ORIGIN`，可填写一个或多个以逗号分隔的可信 Origin。公开部署不建议使用 `*`。
+
 运行：
 
 ```bash
