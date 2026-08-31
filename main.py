@@ -124,6 +124,20 @@ async def miniapp(_: Request):
     return FileResponse("miniapp/miniapp.html", media_type="text/html")
 
 
+async def telegram_webhook(request: Request):
+    secret = request.headers.get("x-telegram-bot-api-secret-token", "")
+    if API_SECRET and not hmac.compare_digest(secret, API_SECRET[:256]):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        update = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    from telegram_bot import handle_update
+    import asyncio
+    asyncio.create_task(handle_update(update))
+    return JSONResponse({"ok": True})
+
+
 async def admin_config(request: Request):
     if not _authorized(request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
