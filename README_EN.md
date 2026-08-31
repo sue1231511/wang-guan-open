@@ -36,6 +36,10 @@ Container deployments may use `entrypoint.sh`, which runs the real-time message 
 
 Set `API_SECRET` for any public deployment. Without it, chat requests are rejected by default unless `ALLOW_INSECURE_NO_SECRET=1` is explicitly enabled for local testing. Browser CORS is disabled by default; use `CORS_ALLOW_ORIGIN` with trusted origins when needed.
 
+Telegram webhooks use an independent `TG_WEBHOOK_SECRET`. If Telegram webhook delivery is enabled, configure the same secret when registering the webhook; `/webhook` rejects requests when it is missing or does not match.
+
+Successful gateway conversations are persisted when Supabase is configured unless `PERSIST_CONVERSATIONS=0` is set. The nightly maintenance task runs once per local day at `NIGHTLY_SUMMARY_HOUR` in `APP_TIMEZONE`, while due reminders remain pending when no delivery transport is configured instead of being silently marked complete.
+
 ## System prompt injection
 
 `SYSTEM_INJECTION_MODE` supports:

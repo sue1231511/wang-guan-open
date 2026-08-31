@@ -2,6 +2,13 @@
 
 Channels mirror the private deployment's useful separation without carrying private names:
 chat / background / vision / proactive / qq / wx.
+
+Resolution order:
+1. channel-specific Supabase llm_config row
+2. channel-specific environment variables
+3. public MiniApp/runtime active provider for chat
+4. generic LLM_* environment variables for chat
+5. non-chat channels fall back to resolved chat config
 """
 from __future__ import annotations
 import os, threading, time, logging, requests
@@ -36,12 +43,72 @@ def _pick_key(row: dict) -> str:
     return row.get("api_key", "")
 
 
-def _env_config(channel: str) -> dict:
+def _specific_env_config(channel: str) -> dict | None:
     p = ENV_PREFIX[channel]
-    base = os.getenv(f"{p}_BASE_URL", os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
-    key = os.getenv(f"{p}_API_KEY", os.getenv("LLM_API_KEY", ""))
-    model = os.getenv(f"{p}_MODEL", os.getenv("LLM_MODEL", ""))
-    return {"base_url": base, "api_key": key, "model": model, "extra_headers": {}, "channel": channel}
+    base = os.getenv(f"{p}_BASE_URL", "").rstrip("/")
+    key = os.getenv(f"{p}_API_KEY", "")
+    model = os.getenv(f"{p}_MODEL", "")
+    if base and key and model:
+        return {"base_url": base, "api_key": key, "model": model, "extra_headers": {}, "channel": channel}
+    return None
+
+
+def _generic_env_chat_config() -> dict:
+    return {
+        "base_url": os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+        "api_key": os.getenv("LLM_API_KEY", ""),
+        "model": os.getenv("LLM_MODEL", ""),
+        "extra_headers": {},
+        "channel": "chat",
+    }
+
+
+def _runtime_chat_config() -> dict | None:
+    """Reuse the active provider managed by the public MiniApp/runtime config."""
+    try:
+        from runtime_config import get_active_provider, get_active_api_key
+        row = get_active_provider()
+        if not row:
+            return None
+        base = str(row.get("base_url") or "").rstrip("/")
+        key = get_active_api_key(row)
+        model = str(row.get("active_model") or row.get("model") or "")
+        if not base or not key or not model:
+            return None
+        return {
+            "base_url": base,
+            "api_key": key,
+            "model": model,
+            "extra_headers": row.get("extra_headers") or {},
+            "channel": "chat",
+            "runtime_provider": True,
+        }
+    except Exception as exc:
+        log.debug("runtime provider fallback unavailable: %s", exc)
+        return None
+
+
+def _supabase_config(channel: str) -> dict | None:
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return None
+    col = CHANNEL_COLUMNS[channel]
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/llm_config?{col}=eq.true&limit=1",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5,
+        )
+        rows = r.json() if r.ok else []
+        if not rows:
+            return None
+        row = rows[0]
+        return {
+            "base_url": row["base_url"].rstrip("/"), "api_key": _pick_key(row),
+            "model": row["model"], "extra_headers": row.get("extra_headers") or {},
+            "config_id": row.get("id"), "channel": channel,
+        }
+    except Exception as exc:
+        log.warning("LLM config %s lookup failed: %s", channel, exc)
+        return None
 
 
 def get_config(channel: str = "chat") -> dict:
@@ -55,27 +122,17 @@ def get_config(channel: str = "chat") -> dict:
         cached = _CACHE.get(channel)
         if cached and time.time() - cached[0] < TTL:
             return cached[1]
-        cfg = None
-        if SUPABASE_URL and SUPABASE_KEY:
-            col = CHANNEL_COLUMNS[channel]
-            try:
-                r = requests.get(
-                    f"{SUPABASE_URL}/rest/v1/llm_config?{col}=eq.true&limit=1",
-                    headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5,
-                )
-                rows = r.json() if r.ok else []
-                if rows:
-                    row = rows[0]
-                    cfg = {
-                        "base_url": row["base_url"].rstrip("/"), "api_key": _pick_key(row),
-                        "model": row["model"], "extra_headers": row.get("extra_headers") or {},
-                        "config_id": row.get("id"), "channel": channel,
-                    }
-            except Exception as exc:
-                log.warning("LLM config %s fallback to env: %s", channel, exc)
-        cfg = cfg or _env_config(channel)
-        if channel != "chat" and (not cfg.get("api_key") or not cfg.get("model")):
+
+        cfg = _supabase_config(channel)
+        if cfg is None:
+            cfg = _specific_env_config(channel)
+
+        if cfg is None and channel == "chat":
+            cfg = _runtime_chat_config() or _generic_env_chat_config()
+        elif cfg is None:
             cfg = get_config("chat")
+            cfg = {**cfg, "channel": channel}
+
         _CACHE[channel] = (time.time(), cfg)
         return cfg
 
@@ -86,8 +143,10 @@ def clear_cache(channel: str | None = None):
 
 
 def record_result(config_id, success: bool, channel: str = "chat", fail_threshold: int = 3):
-    """Report key health. If matching RPCs exist, Supabase can atomically rotate keys/providers.
-    Public deployments that do not install these optional RPCs simply keep working without rotation.
+    """Report key health for Supabase-backed llm_config rows.
+
+    Runtime-config providers rotate in the gateway path itself. Public deployments that do
+    not install the optional Supabase RPCs simply keep working without provider-level RPC rotation.
     """
     if not config_id or not SUPABASE_URL or not SUPABASE_KEY:
         return

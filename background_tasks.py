@@ -11,7 +11,7 @@ from storage import get, update, get_setting, upsert_setting
 from conversation_store import recent
 from llm_runtime import call_llm
 from prompts import PROACTIVE_EXAMPLE
-from scheduled import run_nightly_summary, run_platform_batch_compress
+from scheduled import run_nightly_summary, run_platform_batch_compress, run_platform_summary_maintenance
 from app_config import DEFAULT_TIMEZONE
 
 log=logging.getLogger(__name__)
@@ -54,7 +54,21 @@ async def reminder_checker(send_callback=None):
                 log.warning("reminder delivery failed id=%s: %s",row.get("id"),exc)
                 ok=False
             if ok:
-                update("reminders",f"id=eq.{row['id']}",{"is_done":True})
+                repeat=(row.get("repeat_type") or "once").strip().lower()
+                if repeat in {"daily","weekly"}:
+                    from dateutil.parser import isoparse
+                    from datetime import timedelta
+                    try:
+                        next_at=isoparse(str(row.get("trigger_at") or ""))
+                        step=timedelta(days=1 if repeat=="daily" else 7)
+                        now_utc=datetime.now(timezone.utc)
+                        while next_at <= now_utc:
+                            next_at += step
+                        update("reminders",f"id=eq.{row['id']}",{"trigger_at":next_at.isoformat(),"is_done":False})
+                    except Exception as exc:
+                        log.warning("failed to reschedule recurring reminder id=%s: %s",row.get("id"),exc)
+                else:
+                    update("reminders",f"id=eq.{row['id']}",{"is_done":True})
 
 async def proactive_loop(send_callback=None):
     while True:
@@ -96,4 +110,11 @@ async def platform_compress_loop():
             if len(rows)>=100: await asyncio.to_thread(run_platform_batch_compress)
         except Exception as exc:log.warning("platform compress failed: %s",exc)
 
-REGISTERED_TASKS=[reminder_checker,summary_loop,platform_compress_loop]
+async def platform_maintenance_loop():
+    while True:
+        await asyncio.sleep(6*3600)
+        try:
+            await asyncio.to_thread(run_platform_summary_maintenance)
+        except Exception as exc:log.warning("platform maintenance failed: %s",exc)
+
+REGISTERED_TASKS=[reminder_checker,summary_loop,platform_compress_loop,platform_maintenance_loop]
