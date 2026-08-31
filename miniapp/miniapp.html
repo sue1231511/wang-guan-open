@@ -1,20 +1,140 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gateway MiniApp</title>
+  <title>Gateway MiniApp Example</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }
-    main { max-width: 42rem; margin: auto; }
-    code { background: #eee; padding: .15rem .35rem; }
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f6f6f6; color: #222; }
+    main { max-width: 760px; margin: 0 auto; padding: 24px; }
+    input, textarea, button { width: 100%; box-sizing: border-box; margin-top: 8px; padding: 10px; font: inherit; }
+    textarea { min-height: 120px; resize: vertical; }
+    button { cursor: pointer; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #fff; padding: 12px; border: 1px solid #ddd; min-height: 120px; }
+    .row { margin-bottom: 16px; }
+    .hint { color: #666; font-size: 14px; }
   </style>
 </head>
 <body>
   <main>
-    <h1>MiniApp placeholder</h1>
-    <p>The original private UI is intentionally not included.</p>
-    <p>Replace <code>miniapp/miniapp.html</code> with your own interface.</p>
+    <h1>MiniApp 接线示例</h1>
+    <p class="hint">这只是一个最小可运行示例，用来说明如何调用网关。原私人 UI 不包含在公开仓库中。</p>
+
+    <div class="row">
+      <label>网关地址</label>
+      <input id="gateway" value="" placeholder="留空则使用当前站点，例如 https://your-domain.com" />
+    </div>
+
+    <div class="row">
+      <label>API Secret</label>
+      <input id="secret" type="password" placeholder="对应服务端 API_SECRET" />
+    </div>
+
+    <div class="row">
+      <label>消息</label>
+      <textarea id="message" placeholder="输入一条消息"></textarea>
+    </div>
+
+    <button id="send">发送并读取 SSE 流</button>
+
+    <h2>响应</h2>
+    <pre id="output"></pre>
   </main>
+
+  <script>
+    const gatewayEl = document.getElementById('gateway');
+    const secretEl = document.getElementById('secret');
+    const messageEl = document.getElementById('message');
+    const outputEl = document.getElementById('output');
+    const sendBtn = document.getElementById('send');
+
+    function gatewayBase() {
+      const raw = gatewayEl.value.trim();
+      return (raw || window.location.origin).replace(/\/$/, '');
+    }
+
+    async function streamChat() {
+      const text = messageEl.value.trim();
+      if (!text) return;
+
+      sendBtn.disabled = true;
+      outputEl.textContent = '';
+
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+
+      const secret = secretEl.value.trim();
+      if (secret) {
+        headers['Authorization'] = `Bearer ${secret}`;
+      }
+
+      const response = await fetch(`${gatewayBase()}/v1/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: 'ignored-by-gateway',
+          stream: true,
+          messages: [
+            { role: 'user', content: text }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        outputEl.textContent = `HTTP ${response.status}\n${await response.text()}`;
+        sendBtn.disabled = false;
+        return;
+      }
+
+      if (!response.body) {
+        outputEl.textContent = '浏览器未提供可读取的响应流。';
+        sendBtn.disabled = false;
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+
+          for (const event of events) {
+            const dataLine = event
+              .split('\n')
+              .find(line => line.startsWith('data:'));
+            if (!dataLine) continue;
+
+            const data = dataLine.slice(5).trim();
+            if (!data || data === '[DONE]') continue;
+
+            try {
+              const chunk = JSON.parse(data);
+              const content = chunk?.choices?.[0]?.delta?.content;
+              if (content) outputEl.textContent += content;
+            } catch {
+              // 有些上游可能发送自定义 SSE 数据；示例直接忽略无法解析的块。
+            }
+          }
+        }
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener('click', () => {
+      streamChat().catch(err => {
+        outputEl.textContent = `${err.name}: ${err.message}`;
+        sendBtn.disabled = false;
+      });
+    });
+  </script>
 </body>
 </html>
