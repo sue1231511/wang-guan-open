@@ -49,19 +49,3 @@ def build_context() -> str:
     return "\n\n".join(parts)
 
 
-# Compatibility names used by private/newer deployments. They all resolve to the
-# generic public builder rather than the author's private context graph.
-def build_rikkahub_context(*_args, **_kwargs) -> str:
-    return build_context()
-
-
-def build_bot_context(*_args, **_kwargs) -> str:
-    return build_context()
-
-
-def build_qq_context(*_args, **_kwargs) -> str:
-    return build_context()
-
-
-def build_group_context(*_args, **_kwargs) -> str:
-    return build_context()
