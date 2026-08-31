@@ -5,6 +5,15 @@ from llm_channels import get_config, record_result
 
 log=logging.getLogger(__name__)
 
+
+def _safe_headers(api_key:str, extra_headers:dict|None=None) -> dict:
+    custom={str(k):str(v) for k,v in (extra_headers or {}).items()}
+    for key in list(custom):
+        if key.lower() in {"authorization","content-type"}:
+            custom.pop(key,None)
+    return {**custom,"Authorization":f"Bearer {api_key}","Content-Type":"application/json"}
+
+
 async def call_llm(messages:list,max_tokens:int=4096,tools:list|None=None,extra_body:dict|None=None,channel:str="chat") -> tuple[str,list]:
     cfg=get_config(channel)
     if not cfg.get("api_key") or not cfg.get("model"):
@@ -12,7 +21,7 @@ async def call_llm(messages:list,max_tokens:int=4096,tools:list|None=None,extra_
     payload={"model":cfg["model"],"messages":messages,"max_tokens":max_tokens,"stream":True}
     if tools:payload["tools"]=tools
     if extra_body:payload.update(extra_body)
-    headers={"Authorization":f"Bearer {cfg['api_key']}","Content-Type":"application/json",**(cfg.get("extra_headers") or {})}
+    headers=_safe_headers(cfg["api_key"],cfg.get("extra_headers"))
     content=[]; tc_map={}; got_done=False
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(connect=30,read=180,write=30,pool=30),http2=False) as client:
