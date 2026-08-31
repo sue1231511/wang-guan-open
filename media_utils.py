@@ -10,7 +10,8 @@ from llm_channels import get_config,record_result
 async def _vision(payload,label="vision"):
     import httpx
     cfg=await asyncio.to_thread(get_config,"vision")
-    headers={"Authorization":f"Bearer {cfg['api_key']}","Content-Type":"application/json",**(cfg.get("extra_headers") or {})}
+    extra={str(k):str(v) for k,v in (cfg.get("extra_headers") or {}).items() if str(k).lower() not in {"authorization","content-type"}}
+    headers={**extra,"Authorization":f"Bearer {cfg['api_key']}","Content-Type":"application/json"}
     payload={**payload,"model":cfg["model"]}
     async with httpx.AsyncClient(timeout=90,http2=False) as c:
         r=await c.post(cfg["base_url"]+"/chat/completions",headers=headers,json=payload)
