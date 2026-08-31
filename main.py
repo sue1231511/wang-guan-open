@@ -171,6 +171,8 @@ async def chat_completions(request: Request):
 app = Starlette(routes=[
     Route("/health", health, methods=["GET"]),
     Route("/miniapp", miniapp, methods=["GET"]),
+    Route("/admin/config", admin_config, methods=["GET", "PUT"]),
+    Route("/admin/context-preview", admin_context_preview, methods=["GET"]),
     Route("/v1/chat/completions", chat_completions, methods=["POST"]),
 ])
 
