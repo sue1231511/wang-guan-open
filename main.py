@@ -249,6 +249,30 @@ def _final_text(data: dict) -> str:
         return ""
 
 
+def _last_user_text(messages: list) -> str:
+    for msg in reversed(messages or []):
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "\n".join(str(p.get("text", "")) for p in content if isinstance(p, dict) and p.get("type") == "text").strip()
+    return ""
+
+
+def _persist_turn(user_text: str, assistant_text: str) -> None:
+    if user_text:
+        save_message("user", user_text, scene="message", source="api")
+    if assistant_text:
+        save_message("assistant", assistant_text, scene="message", source="api")
+    if user_text and assistant_text:
+        try:
+            semantic_memory.add_turn(user_text, assistant_text)
+        except Exception:
+            log.exception("semantic memory write failed")
+
+
 async def chat_completions(request: Request):
     if not _authorized(request):
         return JSONResponse({"error": {"message": "Unauthorized"}}, status_code=401)
