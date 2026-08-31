@@ -32,6 +32,8 @@ ALLOW_INSECURE_NO_SECRET = os.environ.get("ALLOW_INSECURE_NO_SECRET", "0") == "1
 CORS_ALLOW_ORIGIN = os.environ.get("CORS_ALLOW_ORIGIN", "").strip()
 UPSTREAM_READ_TIMEOUT = int(os.environ.get("UPSTREAM_READ_TIMEOUT", "180"))
 INJECT_PUBLIC_TOOLS = os.environ.get("INJECT_PUBLIC_TOOLS", "0") == "1"
+PERSIST_CONVERSATIONS = os.environ.get("PERSIST_CONVERSATIONS", "1") != "0"
+TG_WEBHOOK_SECRET = os.environ.get("TG_WEBHOOK_SECRET", "").strip()
 SYSTEM_INJECTION_MODE = os.environ.get("SYSTEM_INJECTION_MODE", "prepend").strip().lower()
 if SYSTEM_INJECTION_MODE not in {"prepend", "append", "replace"}:
     SYSTEM_INJECTION_MODE = "prepend"
