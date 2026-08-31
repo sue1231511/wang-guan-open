@@ -161,6 +161,8 @@ def build_context() -> str:
 
 私人完整版中的个人 Context 查询与注入逻辑不会公开。
 
+公开版默认不会吞掉客户端自己携带的 `system` 消息。`SYSTEM_INJECTION_MODE=prepend` 会把网关 Context 放在客户端 system 前面并保留原内容；也可以改成 `append`。只有显式设置 `SYSTEM_INJECTION_MODE=replace` 时，网关才会完全覆盖客户端原有的 system prompt。
+
 建议把真正私密的数据存放在环境变量、私有数据库或独立私有配置层中。
 
 ---
