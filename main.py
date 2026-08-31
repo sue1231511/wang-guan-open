@@ -426,7 +426,10 @@ async def chat_completions(request: Request):
                                     "choices": [{"index": 0, "delta": {"content": prefix + reasoning}, "finish_reason": None}],
                                 }
                                 yield f"data: {json.dumps(rebuilt, ensure_ascii=False)}\n\n".encode("utf-8")
-                                continue
+                                # Some compatible providers may put reasoning_content and final
+                                # content in the same delta. Do not drop that content.
+                                if not content and not finish_reason:
+                                    continue
                             if in_thinking and (content or finish_reason):
                                 in_thinking = False
                                 close = json.dumps({"choices":[{"index":0,"delta":{"content":"</think>"},"finish_reason":None}]}, ensure_ascii=False)
