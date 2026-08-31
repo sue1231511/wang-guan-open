@@ -2,278 +2,86 @@
 
 > [中文](README.md)
 
-`wang-guan-open` is the **source-available edition** extracted from a private AI gateway project.
+`wang-guan-open` is the **source-available, non-commercial** edition of a private long-running AI gateway. The latest private `wang-guan` codebase is treated as the functional reference: engineering capabilities should be preserved whenever possible, while the author's personal persona, relationship wording, data, visual UI, credentials and private services are removed or replaced with configurable examples.
 
-It publishes reusable engineering structure, interfaces, and extension patterns. It does not include the original project's private persona, relationship settings, custom UI, personal memories, life data, private tools, or private service configuration.
+**This project is not Open Source Software under the OSI definition.** It is licensed under PolyForm Noncommercial License 1.0.0. Commercial resale, paid SaaS, paid hosting and other commercial use are not permitted unless separately authorized. See `LICENSE`.
 
-**This project is not Open Source Software under the OSI definition.** It is licensed under the PolyForm Noncommercial License 1.0.0 and is intended for noncommercial use only. Selling the project, commercializing derivatives, or providing paid services based on it is not permitted under the license. See `LICENSE` for the complete terms.
+## What is included
 
----
+The public build is no longer a minimal skeleton. It currently includes an OpenAI-compatible streaming gateway, configurable Context Builder, Supabase persistence, layered memory, optional Mem0 semantic memory, summaries / threads / reminders, multi-provider and multi-key configuration, internal Tool Calling, reusable MCP sessions, generic Telegram / QQ / WeChat adapters, and a functionally useful MiniApp admin console with a visual design separate from the private UI.
 
-## 1. Purpose
+See `docs/MIGRATION_STATUS.md` for the feature-by-feature restoration status.
 
-This repository is an extensible AI gateway skeleton for building long-running personal AI systems, companion-style AI, chatbot gateways, or agent services.
+## Quick start
 
-The public layer focuses on reusable patterns such as:
-
-- an OpenAI-compatible `/v1/chat/completions` endpoint
-- OpenAI-compatible upstream LLM providers
-- dynamic system-context construction
-- prompt extension hooks
-- Function Calling / Tool Calling patterns
-- background and autonomous task structure
-- MiniApp / admin-page mounting
-- a private-overlay architecture
-
-The public version does not assume what the AI should be called, who the user is, or what relationship exists between them.
-
----
-
-## 2. Relationship to the private project
-
-The private production repository has been used for real personal scenarios for a long time and contains information that belongs only to its original author, including:
-
-- private persona prompts
-- relationship settings and private forms of address
-- private conversation rules
-- original MiniApp HTML / CSS / JavaScript
-- private long-term memories and diaries
-- device, location, health, and work-schedule data
-- private email contacts
-- household, pet, and fictional-world data
-- private MCP / API services
-- private tool implementations
-- bot IDs, group IDs, tokens, keys, and service configuration
-
-None of that belongs in this repository.
-
-This repository is not a mirror of the private project and does not attempt to preserve a one-to-one file layout. It is the reusable engineering layer extracted from it.
-
-```text
-Private production project
-├─ gateway core
-├─ context system
-├─ background tasks
-├─ tool system
-├─ private persona / prompts
-├─ private UI
-├─ private life data
-├─ private services
-└─ personal behavior logic
-
-        ↓ public-safe extraction only
-
-wang-guan-open
-├─ generic gateway structure
-├─ context extension interface
-├─ prompt examples
-├─ tool extension pattern
-├─ background-task example
-└─ MiniApp mounting example
-```
-
----
-
-## 3. Current architecture
-
-The public edition is rebuilt from the latest private-project architecture rather than copied from an older generalized snapshot.
-
-```text
-container
-├─ main.py
-│  └─ realtime HTTP / OpenAI-compatible gateway
-└─ background_main.py
-   └─ independent background-task process
-```
-
-Both processes are launched by `entrypoint.sh`. If either exits, the other is stopped as well so the deployment platform can restart the service as one unit instead of leaving a half-dead deployment running.
-
-The public core also keeps several reusable engineering patterns from the latest architecture:
-
-- `bg_executor.py`: bounded shared thread pool for fire-and-forget work
-- `context.py`: registerable Context Provider mechanism
-- `free_tools.py`: Schema / Dispatch aggregation layer for tools
-- `background_tasks.py`: background coroutine registration point
-- `platforms/`: extension boundary for transport adapters
-
-The private deployment's personal behavior layer is intentionally excluded from these structures.
-
----
-
-## 4. OpenAI-compatible gateway
-
-The public skeleton exposes:
-
-```text
-POST /v1/chat/completions
-```
-
-It can connect to an upstream provider that implements the OpenAI Chat Completions API format.
-
-Basic configuration:
+Configure at least:
 
 ```env
-API_SECRET=change-me
-LLM_BASE_URL=https://example.com/v1
+API_SECRET=please-change-this
+LLM_BASE_URL=https://your-provider.example/v1
 LLM_API_KEY=your-key
 LLM_MODEL=your-model
 ```
 
-> **Always set `API_SECRET` for any public deployment.** When it is empty, the public build rejects `/v1/chat/completions` by default. Unauthenticated access is only enabled when `ALLOW_INSECURE_NO_SECRET=1` is explicitly set, and that option is intended for local testing only. Otherwise, exposing the service publicly can let anyone consume your upstream model quota.
->
-> Cross-origin browser access is disabled by default. Set `CORS_ALLOW_ORIGIN` only when needed, using one or more trusted origins separated by commas. Avoid `*` on public deployments.
-
-Run locally:
+Then:
 
 ```bash
 pip install -r requirements.txt
 python main.py
 ```
 
-Default bind address:
+Container deployments may use `entrypoint.sh`, which runs the real-time message process and the independent background process together.
 
-```text
-0.0.0.0:8000
-```
+### Security
 
----
+Set `API_SECRET` for any public deployment. Without it, chat requests are rejected by default unless `ALLOW_INSECURE_NO_SECRET=1` is explicitly enabled for local testing. Browser CORS is disabled by default; use `CORS_ALLOW_ORIGIN` with trusted origins when needed.
 
-## 5. Context Builder
+## System prompt injection
 
-`context.py` provides the extension point for system-context construction.
+`SYSTEM_INJECTION_MODE` supports:
 
-Minimal example:
+- `prepend` (default): gateway context first, preserve the client's system prompt
+- `append`: client system prompt first, gateway context after it
+- `replace`: fully replace the client's system prompt
 
-```python
-def build_context() -> str:
-    return "Your system context here"
-```
+The public build does not silently discard a client's own system prompt by default.
 
-You can add your own:
+## Context and memory
 
-- persona configuration
-- user profile
-- long-term memory
-- conversation summaries
-- time and calendar context
-- database state
-- domain-specific information
+The generic Context Builder can assemble a configurable persona, `core/current/long_term` memories, rolling cross-platform summaries, `ACTIVE/DORMANT` threads, time context and extension providers. Optional Mem0 semantic memory can also be enabled with your own credentials.
 
-Private context queries and personal data injection logic from the production project are intentionally not published.
+## Models and channels
 
-Sensitive configuration should live in environment variables, a private database, or a separate private overlay.
+The simple deployment path uses `LLM_*`. Independent chat/background/vision/proactive/QQ/WeChat channels are also supported. With a Supabase `llm_config` table, deployments may separate providers using `active`, `bg_active`, `vision_active`, `free_activity_active`, `qq_active` and `wx_active` flags.
 
----
+The MiniApp supports provider management, multiple API keys and models, Prompt / Context preview, streaming chat testing, memories, threads, reminders, maintenance tasks and config import/export. It preserves the **functional value** of the private MiniApp without publishing the author's visual design.
 
-## 6. Prompts
+## Tools and MCP
 
-`prompts.py` contains only generic examples and template patterns.
-
-The following material from the private project is intentionally excluded:
-
-- original persona text
-- private forms of address
-- relationship-specific rules
-- autonomous/free-activity prompts
-- private diary and summary prompts
-- personal behavior rules
-
-Prefer placeholders or environment variables:
+The public build contains working generic examples for memory, activity logs, reminders and configurable MCP weather/search calls. Tool modules use:
 
 ```python
-AI_NAME = os.environ.get("AI_NAME", "AI")
-USER_NAME = os.environ.get("USER_NAME", "User")
+SCHEMAS = [...]
+DISPATCH = {...}
 ```
 
-Do not commit real private prompt material into a public repository.
+and are aggregated by `free_tools.py`. `tools_base.py` preserves MCP initialize/session reuse/session rebuild behavior. Private MCP endpoints are not embedded; point the environment variables at your own services.
 
----
+## Platform adapters
 
-## 7. Tool extensions
+- Telegram: webhook, owner restrictions, group mode, delayed aggregation and tools
+- QQ: OneBot v11 forward WebSocket at `/qq-ws`, private/group chat and basic REPLY/AT formatting
+- WeChat: iLink text long polling, persisted `context_token` and owner restrictions
 
-The private project contains many integrations and tool implementations. Those concrete implementations are not part of this repository.
+A generic Vision / STT / TTS helper layer is included. Remaining private-version media details are being restored through generalized implementations rather than copied with private defaults; see `docs/MIGRATION_STATUS.md`.
 
-The public version keeps only the extension pattern:
+## Private overlay
 
-```python
-def example_tool(text: str) -> str:
-    return text
-
-SCHEMAS = [{
-    "type": "function",
-    "function": {
-        "name": "example_tool",
-        "description": "Example tool",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string"}
-            },
-            "required": ["text"]
-        }
-    }
-}]
-
-DISPATCH = {
-    "example_tool": lambda args: example_tool(args["text"])
-}
-```
-
-`free_tools.py` acts as the aggregation layer.
-
-You can create your own modules following the same convention:
+A recommended layout is:
 
 ```text
-tools_weather.py
-tools_search.py
-tools_calendar.py
-tools_memory.py
-tools_xxx.py
-```
-
----
-
-## 8. Background tasks
-
-`background_main.py` keeps the basic organization pattern for background workloads such as:
-
-- scheduled summaries
-- memory maintenance
-- synchronization
-- periodic checks
-- autonomous agent jobs
-- message polling
-
-The private project's personal automation and life-specific behavior are not included.
-
----
-
-## 9. MiniApp / UI
-
-The production MiniApp is a private UI designed and iterated by the original author over time.
-
-**Its original HTML, CSS, JavaScript, component structure, and visual design are not part of this public repository.**
-
-The repository therefore contains only a minimal mounting example:
-
-```text
-miniapp/miniapp.html
-```
-
-Design your own frontend.
-
-This is an intentional publication boundary, not an incomplete feature.
-
----
-
-## 10. Recommended private overlay
-
-Keep the public core and your personal layer separate:
-
-```text
-wang-guan-open/        # source-available public core
-
-my-private-overlay/    # your private repository
+wang-guan-open/       # public engineering layer
+my-private-overlay/   # your private layer
 ├─ persona/
 ├─ prompts/
 ├─ ui/
@@ -282,41 +90,12 @@ my-private-overlay/    # your private repository
 └─ private-config/
 ```
 
-See `PRIVATE_OVERLAY.example.md` for a minimal example.
+The author's private persona, relationship terms, original MiniApp UI, private memory contents, health/location/schedule data, private MCP services, real IDs/keys/tokens and private household/world data are not included.
 
-This structure makes future sharing, migration, and privacy review substantially easier.
+### Secret diary boundary
 
----
+The private version's diary behavior historically existed in more than one place: a tool module, worker tool lists and background `[DIARY]...[/DIARY]` parsers. The public edition therefore does **not** ship the author's secret-diary implementation or automatic diary-writing behavior. Developers may implement their own private diary tool in a private overlay using the public Tool pattern.
 
-## 11. License
+## License
 
-This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
-
-Permitted examples include:
-
-- personal study and research
-- noncommercial deployment
-- source modification
-- noncommercial derivative works
-- noncommercial redistribution in compliance with the license
-
-Commercial use is not licensed, including examples such as:
-
-- selling this project or a derivative
-- including it in a paid product
-- providing a paid SaaS or hosted service based on it
-- other use intended for commercial gain
-
-For commercial licensing, obtain separate permission from the author.
-
-Because commercial use is restricted, this project is **source-available**, not Open Source Software under the OSI definition.
-
-The complete legal terms are in `LICENSE`.
-
----
-
-## 12. Project boundary
-
-This repository publishes how the system is built. It does not publish the author's private AI.
-
-The engineering structure may be studied and adapted for noncommercial purposes, but the author's persona, relationship model, UI, memories, private data, and private services remain outside the public project.
+PolyForm Noncommercial License 1.0.0. Learning, research, modification and non-commercial deployment/distribution are allowed under the license; commercial sale, paid services and commercial hosting are not.
