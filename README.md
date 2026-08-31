@@ -2,280 +2,84 @@
 
 > [English](README_EN.md)
 
-`wang-guan-open` 是从私人 AI 网关项目中剥离出的**源码公开版**。
+`wang-guan-open` 是私人 AI 网关项目的**源码公开、非商业版本**。最新私人 `wang-guan` 是功能母版：公开版尽量保留工程能力，只剥离作者本人的人格、关系、数据、UI 视觉与私有服务。
 
-它公开的是通用工程结构、接口设计与扩展方式，不包含原私人项目中的人格、关系设定、专属 UI、私人记忆、生活数据、私有工具和服务配置。
+**本项目不是 OSI 定义下的 Open Source Software。** 使用 PolyForm Noncommercial License 1.0.0，仅授权非商业用途。禁止将本项目或衍生版本用于收费销售、收费 SaaS、商业托管或其他商业获利场景，完整条款见 `LICENSE`。
 
-**本项目不是 OSI 定义下的 Open Source Software。** 代码采用 PolyForm Noncommercial License 1.0.0，仅允许非商业用途。禁止将本项目或其衍生版本用于收费销售、商业化服务或其他商业用途。详见 `LICENSE`。
+## 当前能力
 
----
+公开版不是空骨架。目前已包含 OpenAI-compatible 流式网关、Context Builder、Supabase 持久化、分层记忆、Mem0 可选语义记忆、摘要/threads/提醒后台结构、多供应商多 Key、内部 Tool Calling、MCP session 复用、TG / QQ / 微信通用消息接入，以及一套**视觉上重新设计**的 MiniApp 管理台。
 
-## 1. 项目定位
+私人内容不会因为“功能恢复”重新塞回来。具体迁移状态见 `docs/MIGRATION_STATUS.md`。
 
-这是一个可自行扩展的 AI 网关骨架，适合用于搭建长期运行的个人 AI、陪伴型 AI、聊天机器人网关或 Agent 服务。
+## 快速开始
 
-目前公开版保留的方向包括：
-
-- OpenAI 兼容 `/v1/chat/completions` 接口
-- OpenAI-Compatible 上游模型接入
-- 动态 system context 组装
-- Prompt 扩展接口
-- Function Calling / Tool Calling 扩展范式
-- 后台任务与自主任务结构
-- MiniApp / 管理页面挂载方式
-- 私有 Overlay 分层思路
-
-公开版不会预设 AI 必须叫什么，也不会预设使用者是谁、双方是什么关系。
-
----
-
-## 2. 与私人完整版的关系
-
-私人完整版长期用于实际个人场景，内部包含大量只属于原作者本人的内容，例如：
-
-- 私人人格 Prompt
-- 专属关系设定与称呼
-- 私人聊天规则
-- 原始 MiniApp UI / CSS / JavaScript
-- 私人长期记忆与日记
-- 设备、位置、健康、排班等生活数据
-- 私人邮件联系人
-- 家庭、宠物、世界观数据
-- 私有 MCP / API 服务
-- 私人工具实现
-- Bot ID、群 ID、Token、Key 等配置
-
-这些内容**不会进入公开仓库**。
-
-本仓库不是私人仓库的镜像，也不会保持一比一文件对应。更准确地说，它是从私人项目中抽离出的公共工程层。
-
-```text
-私人完整版
-├─ 网关核心
-├─ 上下文系统
-├─ 后台任务
-├─ 工具系统
-├─ 私人人格 / Prompt
-├─ 私人 UI
-├─ 私人生活数据
-├─ 私有服务
-└─ 个人定制逻辑
-
-        ↓ 仅保留可公开部分
-
-wang-guan-open
-├─ 通用网关结构
-├─ Context 扩展接口
-├─ Prompt 示例
-├─ Tool 扩展范式
-├─ Background Task 示例
-└─ MiniApp 挂载示例
-```
-
----
-
-## 3. 当前架构
-
-公开版已经按私人项目的最新工程结构重新整理，而不是基于旧版本直接复制。
-
-```text
-容器
-├─ main.py
-│  └─ HTTP / OpenAI-Compatible 实时网关
-└─ background_main.py
-   └─ 独立后台任务进程
-```
-
-两个进程通过 `entrypoint.sh` 同时启动。任意一个退出时，容器会结束另一个进程，由部署平台统一重启，避免出现只剩半套服务还在运行的状态。
-
-同时保留最新版工程中的几个通用设计：
-
-- `bg_executor.py`：有限大小的共享线程池，避免 fire-and-forget 任务无限创建系统线程
-- `context.py`：可注册的 Context Provider 机制
-- `free_tools.py`：工具 Schema / Dispatch 聚合层
-- `background_tasks.py`：后台协程注册入口
-- `platforms/`：平台传输层的扩展边界
-
-私人项目中的具体行为逻辑不会随这些结构一起公开。
-
----
-
-## 4. OpenAI 兼容网关
-
-公开版提供：
-
-```text
-POST /v1/chat/completions
-```
-
-可接入任意兼容 OpenAI Chat Completions 格式的上游模型。
-
-基础环境变量：
+复制 `.env.example` 配置至少以下内容：
 
 ```env
-API_SECRET=change-me
-LLM_BASE_URL=https://example.com/v1
+API_SECRET=please-change-this
+LLM_BASE_URL=https://your-provider.example/v1
 LLM_API_KEY=your-key
 LLM_MODEL=your-model
 ```
 
-> **公开部署务必设置 `API_SECRET`。** 未设置时，公开版默认拒绝 `/v1/chat/completions` 请求；只有显式设置 `ALLOW_INSECURE_NO_SECRET=1` 才会允许无鉴权访问，这个选项只适合本地测试。否则一旦服务暴露到公网，任何人都可能直接消耗你的上游模型额度。
->
-> 浏览器跨域访问默认关闭。确实需要跨域时再设置 `CORS_ALLOW_ORIGIN`，可填写一个或多个以逗号分隔的可信 Origin。公开部署不建议使用 `*`。
-
-运行：
+安装并运行：
 
 ```bash
 pip install -r requirements.txt
 python main.py
 ```
 
-默认监听：
+容器部署使用 `entrypoint.sh`，会同时运行实时消息进程 `main.py` 和独立后台进程 `background_main.py`。
 
-```text
-0.0.0.0:8000
-```
+### 安全
 
----
+公网部署必须设置 `API_SECRET`。未设置时聊天接口默认拒绝请求，只有显式设置 `ALLOW_INSECURE_NO_SECRET=1` 才允许无鉴权访问。CORS 默认关闭；确实需要浏览器跨域时，用 `CORS_ALLOW_ORIGIN` 指定可信 Origin，不建议公网使用 `*`。
 
-## 5. Context Builder
+## Context 与客户端 system prompt
 
-`context.py` 提供 system context 的扩展入口。
+`SYSTEM_INJECTION_MODE` 支持：
 
-最小写法：
+- `prepend`：默认。网关 Context 在前，保留客户端 system
+- `append`：客户端 system 在前，网关 Context 在后
+- `replace`：完全替换客户端 system
 
-```python
-def build_context() -> str:
-    return "Your system context here"
-```
+公开版默认不会偷偷吞掉客户端自己的 Prompt。
 
-你可以自行加入：
+Context 当前可组合：可配置 Persona、core/current/long_term 记忆、rolling summary、ACTIVE/DORMANT threads、时间，以及扩展 Provider。
 
-- 人格配置
-- 用户画像
-- 长期记忆
-- 对话摘要
-- 时间与日历
-- 数据库状态
-- 自定义业务信息
+## 模型与渠道
 
-私人完整版中的个人 Context 查询与注入逻辑不会公开。
+基础聊天可以直接用 `LLM_*`。也可以为聊天、后台、识图、主动任务、QQ、微信配置独立渠道。若使用 Supabase `llm_config` 表，可按 `active / bg_active / vision_active / free_activity_active / qq_active / wx_active` 分离供应商和模型。
 
-公开版默认不会吞掉客户端自己携带的 `system` 消息。`SYSTEM_INJECTION_MODE=prepend` 会把网关 Context 放在客户端 system 前面并保留原内容；也可以改成 `append`。只有显式设置 `SYSTEM_INJECTION_MODE=replace` 时，网关才会完全覆盖客户端原有的 system prompt。
+MiniApp 提供供应商、多 Key、多 Model、Prompt / Context、流式测试、记忆、线索、提醒与后台维护视图。它保留的是**功能价值**，不是作者私人 UI；页面结构和视觉设计已经重新制作。
 
-建议把真正私密的数据存放在环境变量、私有数据库或独立私有配置层中。
+## Tool / MCP
 
----
-
-## 6. Prompt
-
-`prompts.py` 只提供泛化示例和模板写法。
-
-不会公开原私人项目中的：
-
-- 人格原文
-- 专属称呼
-- 双方关系设定
-- 自由活动 Prompt
-- 私人总结 / 日记 Prompt
-- 私人行为规则
-
-推荐使用占位符或环境变量：
+公开版包含真实可执行的通用工具示例：记忆查询/写入、活动日志、提醒，以及可配置 MCP 天气/搜索示例。每个工具模块使用同一模式：
 
 ```python
-AI_NAME = os.environ.get("AI_NAME", "AI")
-USER_NAME = os.environ.get("USER_NAME", "User")
+SCHEMAS = [...]
+DISPATCH = {...}
 ```
 
-不要把真实私人内容直接提交到公开仓库。
+由 `free_tools.py` 聚合。`tools_base.py` 保留 MCP initialize / session 复用 / 失效重连机制。私人 MCP URL 不会写死在仓库里，请通过环境变量连接你自己的服务。
 
----
+## 平台接入
 
-## 7. Tool 扩展方式
+- Telegram：Webhook、owner 限制、群聊、延迟聚合、工具循环
+- QQ：OneBot v11 正向 WebSocket `/qq-ws`、私聊/群聊、基础 REPLY/AT 格式
+- 微信：iLink 文本长轮询、context_token 持久化、owner 限制
 
-私人完整版拥有大量外部工具和服务接入，这些具体实现不会公开。
+媒体通用层提供 Vision / STT / TTS Provider helper。更完整的平台媒体细节会继续按最新私人版泛化恢复，状态写在 `docs/MIGRATION_STATUS.md`，不会用“删掉”冒充脱敏。
 
-公开版只保留工具开发范式：
+## 私人 Overlay
 
-```python
-def example_tool(text: str) -> str:
-    return text
-
-SCHEMAS = [{
-    "type": "function",
-    "function": {
-        "name": "example_tool",
-        "description": "Example tool",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string"}
-            },
-            "required": ["text"]
-        }
-    }
-}]
-
-DISPATCH = {
-    "example_tool": lambda args: example_tool(args["text"])
-}
-```
-
-再由 `free_tools.py` 统一聚合。
-
-你可以按同一结构创建自己的：
+推荐维护两个层：
 
 ```text
-tools_weather.py
-tools_search.py
-tools_calendar.py
-tools_memory.py
-tools_xxx.py
-```
-
----
-
-## 8. Background Tasks
-
-`background_main.py` 保留后台任务的基本组织形式，可用于：
-
-- 定时总结
-- 记忆整理
-- 数据同步
-- 定时检查
-- Agent 自主任务
-- 消息轮询
-
-私人完整版中的具体自主行为、生活逻辑与私人自动化不会公开。
-
----
-
-## 9. MiniApp / UI
-
-私人完整版中的 MiniApp 是原作者长期自行设计和修改的私人 UI。
-
-**原始 HTML、CSS、JavaScript、页面结构、组件和视觉方案均不属于本公开项目。**
-
-因此公开仓库只保留一个最小挂载示例，用于说明如何通过网关提供自己的管理页面。
-
-```text
-miniapp/miniapp.html
-```
-
-请自行设计前端。
-
-这不是缺失文件，也不是待补全功能，而是明确的公开边界。
-
----
-
-## 10. 推荐的私人 Overlay 结构
-
-建议把公共核心和私人层分开维护：
-
-```text
-wang-guan-open/        # 源码公开的公共核心
-
-my-private-overlay/    # 你自己的私有仓库
+wang-guan-open/       # 通用工程能力，源码公开
+my-private-overlay/   # 只属于你的内容
 ├─ persona/
 ├─ prompts/
 ├─ ui/
@@ -284,41 +88,12 @@ my-private-overlay/    # 你自己的私有仓库
 └─ private-config/
 ```
 
-仓库中的 `PRIVATE_OVERLAY.example.md` 提供了一个简单示例。
+作者私人版中的专属人格、称呼、关系逻辑、真实 MiniApp UI、生活数据、私有 MCP、真实 ID/Key/Token、小家世界观等不会进入公开仓库。
 
-这种结构可以避免未来分享代码时反复做隐私清理。
+### 关于秘密日记
 
----
+私人版的秘密日记曾经不仅存在于单独模块，还可能通过 Tool Schema、worker import、后台 `[DIARY]` parser 等路径被触发。因此公开版不提供作者秘密日记的默认可用实现。扩展者当然可以按 Tool 范式自行实现自己的私有日记模块，但需要放在自己的私有 Overlay 中。
 
-## 11. 许可协议
+## 许可
 
-本项目采用 **PolyForm Noncommercial License 1.0.0**。
-
-允许：
-
-- 个人学习与研究
-- 非商业部署
-- 修改源码
-- 制作非商业衍生版本
-- 在遵守协议的前提下分发非商业版本
-
-不允许：
-
-- 将本项目或衍生版本收费售卖
-- 将其作为付费产品的一部分提供
-- 以本项目为基础提供收费 SaaS / 托管服务
-- 其他以商业获利为目的的使用
-
-需要商业授权，请先取得作者单独许可。
-
-注意：由于协议限制商业用途，本项目属于 **source-available（源码公开）**，而不是 OSI 定义下的 Open Source Software。
-
-完整法律文本以 `LICENSE` 为准。
-
----
-
-## 12. 项目原则
-
-这个仓库公开的是“怎么搭”，不是“把我的私人 AI 拿走”。
-
-工程结构可以参考和二次开发，但原作者的人格、关系、UI、记忆、私人数据与服务边界不会随代码一并公开。
+PolyForm Noncommercial License 1.0.0。允许学习、研究、修改和非商业部署/分发；不允许商业销售、收费服务或商业托管。需要商业授权请单独取得作者许可。

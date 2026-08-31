@@ -3,3 +3,7 @@ uvicorn>=0.32,<1
 httpx>=0.27,<1
 requests>=2.32,<3
 python-dateutil>=2.9,<3
+openai>=1.50,<3
+# Optional features:
+# mem0ai   -> semantic memory
+# supabase -> not required; public build uses REST directly
