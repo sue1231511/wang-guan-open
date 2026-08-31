@@ -13,6 +13,9 @@ from starlette.middleware.cors import CORSMiddleware
 
 from context import build_context
 from free_tools import TOOL_SCHEMAS, TOOL_DISPATCH
+from conversation_store import save_message
+from memory_store import semantic_memory
+from routes_admin import memories as admin_memories, threads as admin_threads, reminders as admin_reminders, trigger_summary, trigger_compress
 from runtime_config import (
     load_config,
     save_config,
