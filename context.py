@@ -25,10 +25,18 @@ def unregister_context_provider(provider: ContextProvider) -> None:
 
 
 def _base_prompt() -> str:
-    return os.environ.get(
+    # Runtime config is optional. Environment variable remains a deployment-level
+    # fallback, while the public MiniApp can edit the generic prompt without
+    # exposing the private project's prompt system.
+    try:
+        from runtime_config import get_system_prompt
+        runtime_prompt = get_system_prompt()
+    except Exception:
+        runtime_prompt = ""
+    return (runtime_prompt or os.environ.get(
         "SYSTEM_PROMPT",
         "You are a helpful AI assistant. Follow the user's instructions and the configured policies.",
-    ).strip()
+    )).strip()
 
 
 def _time_context() -> str:
