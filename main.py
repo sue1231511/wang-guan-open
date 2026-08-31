@@ -368,9 +368,56 @@ async def chat_completions(request: Request):
                         }, ensure_ascii=False)
                         yield f"data: {chunk}\n\ndata: [DONE]\n\n".encode("utf-8")
                         return
-                    async for raw in resp.aiter_bytes():
-                        if raw:
-                            yield raw
+                    assistant_buf = []
+                    has_tool_calls = False
+                    in_thinking = False
+                    got_done = False
+                    async for line in resp.aiter_lines():
+                        if not line:
+                            continue
+                        if not line.startswith("data:"):
+                            continue
+                        data_str = line[5:].strip()
+                        if data_str == "[DONE]":
+                            if in_thinking:
+                                close = json.dumps({"choices":[{"index":0,"delta":{"content":"</think>"},"finish_reason":None}]}, ensure_ascii=False)
+                                yield f"data: {close}\n\n".encode("utf-8")
+                            got_done = True
+                            yield b"data: [DONE]\n\n"
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            choice = (chunk.get("choices") or [{}])[0]
+                            delta = choice.get("delta") or {}
+                            if delta.get("tool_calls"):
+                                has_tool_calls = True
+                            reasoning = delta.get("reasoning_content") or ""
+                            content = delta.get("content") or ""
+                            finish_reason = choice.get("finish_reason")
+                            if reasoning:
+                                prefix = "<think>" if not in_thinking else ""
+                                in_thinking = True
+                                rebuilt = {
+                                    "id": chunk.get("id", ""), "object": chunk.get("object", "chat.completion.chunk"),
+                                    "created": chunk.get("created", 0), "model": chunk.get("model", ""),
+                                    "choices": [{"index": 0, "delta": {"content": prefix + reasoning}, "finish_reason": None}],
+                                }
+                                yield f"data: {json.dumps(rebuilt, ensure_ascii=False)}\n\n".encode("utf-8")
+                                continue
+                            if in_thinking and (content or finish_reason):
+                                in_thinking = False
+                                close = json.dumps({"choices":[{"index":0,"delta":{"content":"</think>"},"finish_reason":None}]}, ensure_ascii=False)
+                                yield f"data: {close}\n\n".encode("utf-8")
+                            if content:
+                                assistant_buf.append(content)
+                            yield (line + "\n\n").encode("utf-8")
+                        except Exception:
+                            yield (line + "\n\n").encode("utf-8")
+                    if not got_done:
+                        log.warning("upstream stream ended without [DONE]")
+                    assistant_text = "".join(assistant_buf).strip()
+                    if assistant_text and not has_tool_calls:
+                        _persist_turn(user_text, assistant_text)
                     return
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
                 if runtime_provider and attempt + 1 < tries:
