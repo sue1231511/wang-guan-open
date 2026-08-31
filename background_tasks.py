@@ -11,7 +11,7 @@ from storage import get, update, get_setting, upsert_setting
 from conversation_store import recent
 from llm_runtime import call_llm
 from prompts import PROACTIVE_EXAMPLE
-from scheduled import run_nightly_summary, run_platform_batch_compress
+from scheduled import run_nightly_summary, run_platform_batch_compress, run_platform_summary_maintenance
 from app_config import DEFAULT_TIMEZONE
 
 log=logging.getLogger(__name__)
