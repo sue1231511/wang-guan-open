@@ -36,6 +36,14 @@ python main.py
 
 公网部署必须设置 `API_SECRET`。未设置时聊天接口默认拒绝请求，只有显式设置 `ALLOW_INSECURE_NO_SECRET=1` 才允许无鉴权访问。CORS 默认关闭；确实需要浏览器跨域时，用 `CORS_ALLOW_ORIGIN` 指定可信 Origin，不建议公网使用 `*`。
 
+Telegram Webhook 使用独立的 `TG_WEBHOOK_SECRET`，不复用 `API_SECRET`，也不跟随 insecure 模式放行。配置 Telegram webhook 时必须同时设置这个 secret。
+
+配置 Supabase 后，网关成功对话默认自动写入 `chat_context`，并可进入摘要、记忆与 threads 流程。若只想做代理而不保存对话，可设置 `PERSIST_CONVERSATIONS=0`。
+
+提醒后台不会在“没有投递通道”时把提醒标记为完成。若配置了 `TG_BOT_TOKEN + TG_OWNER_ID`，公开版会自动使用 Telegram 投递；未配置投递通道时，到期提醒会继续保持 pending。
+
+夜间维护默认按 `APP_TIMEZONE` 的凌晨 `NIGHTLY_SUMMARY_HOUR=4` 每天最多执行一次，而不是每 30 分钟重复跑。
+
 ## Context 与客户端 system prompt
 
 `SYSTEM_INJECTION_MODE` 支持：
