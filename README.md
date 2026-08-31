@@ -2,19 +2,167 @@
 
 > [English](README_EN.md)
 
-`wang-guan-open` 是私人 AI 网关项目的**源码公开、非商业版本**。最新私人 `wang-guan` 是功能母版：公开版尽量保留工程能力，只剥离作者本人的人格、关系、数据、UI 视觉与私有服务。
+Wang Guan Open 是一个面向个人 AI 的通用网关与运行框架。
 
-**本项目不是 OSI 定义下的 Open Source Software。** 使用 PolyForm Noncommercial License 1.0.0，仅授权非商业用途。禁止将本项目或衍生版本用于收费销售、收费 SaaS、商业托管或其他商业获利场景，完整条款见 `LICENSE`。
+它负责把模型供应商、聊天客户端、消息平台、上下文、记忆、工具调用和后台任务接到同一套系统里。对外提供 OpenAI-compatible API，也可以直接接入 Telegram、QQ、微信等消息入口。
 
-## 当前能力
+如果你想做一个长期运行、带记忆、能接多个模型和多个聊天入口、还能继续自己扩展工具与后台能力的 AI，这个项目可以作为底座。
 
-公开版不是空骨架。目前已包含 OpenAI-compatible 流式网关、Context Builder、Supabase 持久化、分层记忆、Mem0 可选语义记忆、摘要/threads/提醒后台结构、多供应商多 Key、内部 Tool Calling、MCP session 复用、TG / QQ / 微信通用消息接入，以及一套**视觉上重新设计**的 MiniApp 管理台。
+## 主要能力
 
-私人内容不会因为“功能恢复”重新塞回来。具体迁移状态见 `docs/MIGRATION_STATUS.md`。
+### OpenAI-compatible 网关
+
+提供：
+
+```text
+POST /v1/chat/completions
+```
+
+支持：
+
+- SSE 流式输出
+- OpenAI-compatible 请求格式
+- reasoning 内容兼容
+- 上游超时处理
+- 多 Key 失败轮换
+- 客户端自带 Tool 的透明转发
+- 可选的网关内部 Tool Calling
+
+### 多供应商 / 多模型
+
+可以配置多个模型供应商，每个供应商支持：
+
+- Base URL
+- 多个 API Key
+- 多个 Model
+- 当前使用模型
+- 自定义 Headers
+
+同时支持不同用途使用不同模型渠道：
+
+- chat
+- background
+- vision
+- proactive
+- QQ
+- WeChat
+
+既可以通过环境变量配置，也可以使用 Supabase `llm_config`，或者直接在 MiniApp 中管理通用 Runtime Provider。
+
+### Context Builder
+
+每次调用模型前，可以自动组合上下文，包括：
+
+- System Prompt
+- Persona Profile
+- `core / current / long_term` 分层记忆
+- 跨平台滚动摘要
+- `ACTIVE / DORMANT` threads
+- 当前时间
+- 自定义 Context Provider
+
+额外数据源可以通过 Provider 接口继续扩展，不需要把所有逻辑硬塞进主文件。
+
+### 记忆与对话维护
+
+支持 Supabase 持久化，并提供：
+
+- 对话历史保存
+- 分层记忆
+- 可选 Mem0 语义记忆
+- 日总结
+- current 记忆刷新
+- threads 扫描与状态维护
+- 跨平台消息批量压缩
+- 滚动摘要定期合并
+- 长期记忆抽取
+- 近期摘要窗口维护
+
+适合长时间运行，而不是每次启动都从零开始。
+
+### Tool Calling / MCP
+
+内部工具统一使用：
+
+```python
+SCHEMAS = [...]
+DISPATCH = {...]
+```
+
+由 `free_tools.py` 聚合。
+
+项目同时提供 MCP 调用基础设施，包括：
+
+- initialize
+- session 复用
+- `Mcp-Session-Id`
+- session 失效后重新初始化
+- JSON / SSE MCP 响应解析
+
+仓库里附带通用示例，可以按同样结构接自己的工具或 MCP 服务。
+
+### 消息平台
+
+目前包含：
+
+- Telegram Webhook
+- Telegram 私聊 / 群聊
+- QQ OneBot v11 正向 WebSocket
+- QQ 私聊 / 群聊
+- QQ REPLY / AT 格式
+- 微信 iLink 文本长轮询
+- 微信 `context_token` 持久化
+- 消息延迟聚合
+- 平台内 Tool Calling
+
+### 图片 / 语音基础能力
+
+提供通用媒体 helper：
+
+- Vision
+- STT
+- TTS
+
+具体平台的图片、语音、引用、表情等能力可以继续往现有适配层扩展。
+
+### Reminders 与后台任务
+
+独立后台进程负责周期任务，包括：
+
+- reminders 检查与投递
+- daily / weekly recurring reminders
+- 夜间总结
+- 跨平台消息压缩
+- 滚动摘要维护
+
+`entrypoint.sh` 会同时启动实时网关进程和后台进程。
+
+### MiniApp 管理台
+
+项目自带一个轻量管理页面，可用于：
+
+- 配置模型供应商
+- 管理多个 API Key
+- 管理多个 Model
+- 切换当前模型
+- 编辑 System Prompt
+- 预览完整 Context
+- 查看 memories
+- 查看 threads
+- 查看 reminders
+- 手动触发总结 / 压缩
+- 测试流式聊天
+- 导入 / 导出 Runtime 配置
+
+访问：
+
+```text
+/miniapp
+```
 
 ## 快速开始
 
-复制 `.env.example` 配置至少以下内容：
+复制 `.env.example`，至少配置：
 
 ```env
 API_SECRET=please-change-this
@@ -23,85 +171,142 @@ LLM_API_KEY=your-key
 LLM_MODEL=your-model
 ```
 
-安装并运行：
+安装依赖：
 
 ```bash
 pip install -r requirements.txt
+```
+
+运行：
+
+```bash
 python main.py
 ```
 
-容器部署使用 `entrypoint.sh`，会同时运行实时消息进程 `main.py` 和独立后台进程 `background_main.py`。
+如果需要同时运行后台任务：
 
-### 安全
+```bash
+./entrypoint.sh
+```
 
-公网部署必须设置 `API_SECRET`。未设置时聊天接口默认拒绝请求，只有显式设置 `ALLOW_INSECURE_NO_SECRET=1` 才允许无鉴权访问。CORS 默认关闭；确实需要浏览器跨域时，用 `CORS_ALLOW_ORIGIN` 指定可信 Origin，不建议公网使用 `*`。
+Docker 也已经包含对应启动方式。
 
-Telegram Webhook 使用独立的 `TG_WEBHOOK_SECRET`，不复用 `API_SECRET`，也不跟随 insecure 模式放行。配置 Telegram webhook 时必须同时设置这个 secret。
+## 常用配置
 
-配置 Supabase 后，网关成功对话默认自动写入 `chat_context`，并可进入摘要、记忆与 threads 流程。若只想做代理而不保存对话，可设置 `PERSIST_CONVERSATIONS=0`。
+### 网关
 
-提醒后台不会在“没有投递通道”时把提醒标记为完成。若配置了 `TG_BOT_TOKEN + TG_OWNER_ID`，公开版会自动使用 Telegram 投递；未配置投递通道时，到期提醒会继续保持 pending。
-
-夜间维护默认按 `APP_TIMEZONE` 的凌晨 `NIGHTLY_SUMMARY_HOUR=4` 每天最多执行一次，而不是每 30 分钟重复跑。
-
-## Context 与客户端 system prompt
+```env
+API_SECRET=
+PORT=8000
+UPSTREAM_READ_TIMEOUT=180
+SYSTEM_INJECTION_MODE=prepend
+PERSIST_CONVERSATIONS=1
+```
 
 `SYSTEM_INJECTION_MODE` 支持：
 
-- `prepend`：默认。网关 Context 在前，保留客户端 system
-- `append`：客户端 system 在前，网关 Context 在后
-- `replace`：完全替换客户端 system
+- `prepend`
+- `append`
+- `replace`
 
-公开版默认不会偷偷吞掉客户端自己的 Prompt。
+### 默认模型
 
-Context 当前可组合：可配置 Persona、core/current/long_term 记忆、rolling summary、ACTIVE/DORMANT threads、时间，以及扩展 Provider。
-
-## 模型与渠道
-
-基础聊天可以直接用 `LLM_*`。也可以为聊天、后台、识图、主动任务、QQ、微信配置独立渠道。若使用 Supabase `llm_config` 表，可按 `active / bg_active / vision_active / free_activity_active / qq_active / wx_active` 分离供应商和模型。
-
-MiniApp 提供供应商、多 Key、多 Model、Prompt / Context、流式测试、记忆、线索、提醒与后台维护视图。它保留的是**功能价值**，不是作者私人 UI；页面结构和视觉设计已经重新制作。
-
-## Tool / MCP
-
-公开版包含真实可执行的通用工具示例：记忆查询/写入、活动日志、提醒，以及可配置 MCP 天气/搜索示例。每个工具模块使用同一模式：
-
-```python
-SCHEMAS = [...]
-DISPATCH = {...}
+```env
+LLM_BASE_URL=
+LLM_API_KEY=
+LLM_MODEL=
 ```
 
-由 `free_tools.py` 聚合。`tools_base.py` 保留 MCP initialize / session 复用 / 失效重连机制。私人 MCP URL 不会写死在仓库里，请通过环境变量连接你自己的服务。
+### 独立模型渠道
 
-## 平台接入
+```env
+CHAT_BASE_URL=
+CHAT_API_KEY=
+CHAT_MODEL=
 
-- Telegram：Webhook、owner 限制、群聊、延迟聚合、工具循环
-- QQ：OneBot v11 正向 WebSocket `/qq-ws`、私聊/群聊、基础 REPLY/AT 格式
-- 微信：iLink 文本长轮询、context_token 持久化、owner 限制
+BG_CHAT_BASE_URL=
+BG_CHAT_API_KEY=
+BG_CHAT_MODEL=
 
-媒体通用层提供 Vision / STT / TTS Provider helper。更完整的平台媒体细节会继续按最新私人版泛化恢复，状态写在 `docs/MIGRATION_STATUS.md`，不会用“删掉”冒充脱敏。
+VISION_BASE_URL=
+VISION_API_KEY=
+VISION_MODEL=
 
-## 私人 Overlay
+PROACTIVE_BASE_URL=
+PROACTIVE_API_KEY=
+PROACTIVE_MODEL=
 
-推荐维护两个层：
+QQ_LLM_BASE_URL=
+QQ_LLM_API_KEY=
+QQ_LLM_MODEL=
+
+WX_LLM_BASE_URL=
+WX_LLM_API_KEY=
+WX_LLM_MODEL=
+```
+
+未单独配置的渠道会回退到通用聊天模型。
+
+### Supabase
+
+```env
+SUPABASE_URL=
+SUPABASE_KEY=
+```
+
+用于对话、记忆、threads、reminders、摘要和部分运行配置持久化。
+
+### Telegram
+
+```env
+TG_BOT_TOKEN=
+TG_OWNER_ID=
+TG_GROUP_IDS=
+TG_WEBHOOK_SECRET=
+```
+
+### QQ
+
+```env
+QQ_WS_TOKEN=
+QQ_BOT_ID=
+QQ_OWNER_ID=
+QQ_GROUP_IDS=
+```
+
+OneBot v11 WebSocket 地址：
 
 ```text
-wang-guan-open/       # 通用工程能力，源码公开
-my-private-overlay/   # 只属于你的内容
-├─ persona/
-├─ prompts/
-├─ ui/
-├─ tools/
-├─ integrations/
-└─ private-config/
+/qq-ws
 ```
 
-作者私人版中的专属人格、称呼、关系逻辑、真实 MiniApp UI、生活数据、私有 MCP、真实 ID/Key/Token、小家世界观等不会进入公开仓库。
+### 微信
 
-### 关于秘密日记
+```env
+WX_ILINK_TOKEN=
+WX_ILINK_BOT_ID=
+WX_OWNER_ID=
+```
 
-私人版的秘密日记曾经不仅存在于单独模块，还可能通过 Tool Schema、worker import、后台 `[DIARY]` parser 等路径被触发。因此公开版不提供作者秘密日记的默认可用实现。扩展者当然可以按 Tool 范式自行实现自己的私有日记模块，但需要放在自己的私有 Overlay 中。
+## 扩展方式
 
-## 许可
+这个项目更适合继续往上加东西，而不是修改一坨核心代码。
 
-PolyForm Noncommercial License 1.0.0。允许学习、研究、修改和非商业部署/分发；不允许商业销售、收费服务或商业托管。需要商业授权请单独取得作者许可。
+常见扩展入口：
+
+```text
+Context Provider  -> 增加新的上下文来源
+Tool Module       -> 增加新的函数工具
+MCP               -> 接外部能力
+Platform Adapter  -> 接新的聊天平台
+Background Task   -> 增加周期任务
+MiniApp           -> 增加自己的管理功能
+```
+
+保持各模块职责分开，后续升级会轻松很多。
+
+## License
+
+PolyForm Noncommercial License 1.0.0。
+
+允许学习、研究、修改和非商业部署 / 分发；商业销售、收费 SaaS、收费托管或其他商业用途不在许可范围内。完整条款见 `LICENSE`。

@@ -2,19 +2,167 @@
 
 > [中文](README.md)
 
-`wang-guan-open` is the **source-available, non-commercial** edition of a private long-running AI gateway. The latest private `wang-guan` codebase is treated as the functional reference: engineering capabilities should be preserved whenever possible, while the author's personal persona, relationship wording, data, visual UI, credentials and private services are removed or replaced with configurable examples.
+Wang Guan Open is a general-purpose gateway and runtime framework for personal AI systems.
 
-**This project is not Open Source Software under the OSI definition.** It is licensed under PolyForm Noncommercial License 1.0.0. Commercial resale, paid SaaS, paid hosting and other commercial use are not permitted unless separately authorized. See `LICENSE`.
+It brings model providers, chat clients, messaging platforms, context, memory, tool calling and background jobs into one runtime. It exposes an OpenAI-compatible API and can also connect directly to Telegram, QQ and WeChat.
 
-## What is included
+If you want to build a long-running AI system with memory, multiple model providers, multiple chat entry points and room for custom tools and background automation, this project can be used as the foundation.
 
-The public build is no longer a minimal skeleton. It currently includes an OpenAI-compatible streaming gateway, configurable Context Builder, Supabase persistence, layered memory, optional Mem0 semantic memory, summaries / threads / reminders, multi-provider and multi-key configuration, internal Tool Calling, reusable MCP sessions, generic Telegram / QQ / WeChat adapters, and a functionally useful MiniApp admin console with a visual design separate from the private UI.
+## Core capabilities
 
-See `docs/MIGRATION_STATUS.md` for the feature-by-feature restoration status.
+### OpenAI-compatible gateway
+
+Endpoint:
+
+```text
+POST /v1/chat/completions
+```
+
+Supports:
+
+- SSE streaming
+- OpenAI-compatible request format
+- reasoning-content compatibility
+- upstream timeouts
+- multi-key rotation on failures
+- transparent forwarding of client-managed tools
+- optional internal Tool Calling
+
+### Multi-provider / multi-model runtime
+
+Each provider can contain:
+
+- Base URL
+- multiple API keys
+- multiple models
+- active model
+- custom headers
+
+Independent model channels are supported for:
+
+- chat
+- background
+- vision
+- proactive
+- QQ
+- WeChat
+
+Configuration can come from environment variables, Supabase `llm_config`, or the generic Runtime Provider managed by the MiniApp.
+
+### Context Builder
+
+Before each model call, the gateway can assemble:
+
+- System Prompt
+- Persona Profile
+- `core / current / long_term` layered memories
+- cross-platform rolling summaries
+- `ACTIVE / DORMANT` threads
+- current time
+- custom Context Providers
+
+Additional context sources can be registered without turning the main gateway into a monolith.
+
+### Memory and conversation maintenance
+
+Supabase-backed persistence supports:
+
+- conversation history
+- layered memories
+- optional Mem0 semantic memory
+- daily summaries
+- current-memory refresh
+- thread scanning and state maintenance
+- cross-platform batch compression
+- rolling-summary merging
+- long-term memory extraction
+- recent-summary window maintenance
+
+The runtime is designed for long-lived AI sessions rather than stateless one-off requests.
+
+### Tool Calling / MCP
+
+Internal tools use a simple registry pattern:
+
+```python
+SCHEMAS = [...]
+DISPATCH = {...]
+```
+
+and are aggregated by `free_tools.py`.
+
+The MCP helper layer includes:
+
+- initialize
+- reusable sessions
+- `Mcp-Session-Id`
+- session rebuild after invalidation
+- JSON / SSE response parsing
+
+Generic examples are included and can be replaced or extended with your own tools and MCP services.
+
+### Messaging platforms
+
+Current adapters include:
+
+- Telegram webhook
+- Telegram private/group chat
+- QQ OneBot v11 forward WebSocket
+- QQ private/group chat
+- QQ REPLY / AT formatting
+- WeChat iLink text long polling
+- persisted WeChat `context_token`
+- delayed message aggregation
+- tool loops inside platform conversations
+
+### Vision / speech helpers
+
+Generic helpers are included for:
+
+- Vision
+- STT
+- TTS
+
+Platform-specific image, audio, reply and sticker behavior can be extended on top of the existing adapters.
+
+### Reminders and background jobs
+
+The independent background process handles jobs such as:
+
+- reminder checking and delivery
+- daily / weekly recurring reminders
+- nightly summaries
+- cross-platform message compression
+- rolling-summary maintenance
+
+`entrypoint.sh` starts both the real-time gateway and background process.
+
+### MiniApp admin console
+
+A lightweight admin page is included for:
+
+- provider management
+- multiple API keys
+- multiple models
+- active-model selection
+- System Prompt editing
+- Context preview
+- memory inspection
+- thread inspection
+- reminder inspection
+- manual summary / compression triggers
+- streaming chat tests
+- Runtime config import / export
+
+Open:
+
+```text
+/miniapp
+```
 
 ## Quick start
 
-Configure at least:
+Copy `.env.example` and configure at least:
 
 ```env
 API_SECRET=please-change-this
@@ -23,83 +171,140 @@ LLM_API_KEY=your-key
 LLM_MODEL=your-model
 ```
 
-Then:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
+```
+
+Run the gateway:
+
+```bash
 python main.py
 ```
 
-Container deployments may use `entrypoint.sh`, which runs the real-time message process and the independent background process together.
+To run the gateway and background process together:
 
-### Security
+```bash
+./entrypoint.sh
+```
 
-Set `API_SECRET` for any public deployment. Without it, chat requests are rejected by default unless `ALLOW_INSECURE_NO_SECRET=1` is explicitly enabled for local testing. Browser CORS is disabled by default; use `CORS_ALLOW_ORIGIN` with trusted origins when needed.
+Docker uses the same entrypoint.
 
-Telegram webhooks use an independent `TG_WEBHOOK_SECRET`. If Telegram webhook delivery is enabled, configure the same secret when registering the webhook; `/webhook` rejects requests when it is missing or does not match.
+## Common configuration
 
-Successful gateway conversations are persisted when Supabase is configured unless `PERSIST_CONVERSATIONS=0` is set. The nightly maintenance task runs once per local day at `NIGHTLY_SUMMARY_HOUR` in `APP_TIMEZONE`, while due reminders remain pending when no delivery transport is configured instead of being silently marked complete.
+### Gateway
 
-## System prompt injection
+```env
+API_SECRET=
+PORT=8000
+UPSTREAM_READ_TIMEOUT=180
+SYSTEM_INJECTION_MODE=prepend
+PERSIST_CONVERSATIONS=1
+```
 
 `SYSTEM_INJECTION_MODE` supports:
 
-- `prepend` (default): gateway context first, preserve the client's system prompt
-- `append`: client system prompt first, gateway context after it
-- `replace`: fully replace the client's system prompt
+- `prepend`
+- `append`
+- `replace`
 
-The public build does not silently discard a client's own system prompt by default.
+### Default model
 
-## Context and memory
-
-The generic Context Builder can assemble a configurable persona, `core/current/long_term` memories, rolling cross-platform summaries, `ACTIVE/DORMANT` threads, time context and extension providers. Optional Mem0 semantic memory can also be enabled with your own credentials.
-
-## Models and channels
-
-The simple deployment path uses `LLM_*`. Independent chat/background/vision/proactive/QQ/WeChat channels are also supported. With a Supabase `llm_config` table, deployments may separate providers using `active`, `bg_active`, `vision_active`, `free_activity_active`, `qq_active` and `wx_active` flags.
-
-The MiniApp supports provider management, multiple API keys and models, Prompt / Context preview, streaming chat testing, memories, threads, reminders, maintenance tasks and config import/export. It preserves the **functional value** of the private MiniApp without publishing the author's visual design.
-
-## Tools and MCP
-
-The public build contains working generic examples for memory, activity logs, reminders and configurable MCP weather/search calls. Tool modules use:
-
-```python
-SCHEMAS = [...]
-DISPATCH = {...}
+```env
+LLM_BASE_URL=
+LLM_API_KEY=
+LLM_MODEL=
 ```
 
-and are aggregated by `free_tools.py`. `tools_base.py` preserves MCP initialize/session reuse/session rebuild behavior. Private MCP endpoints are not embedded; point the environment variables at your own services.
+### Independent model channels
 
-## Platform adapters
+```env
+CHAT_BASE_URL=
+CHAT_API_KEY=
+CHAT_MODEL=
 
-- Telegram: webhook, owner restrictions, group mode, delayed aggregation and tools
-- QQ: OneBot v11 forward WebSocket at `/qq-ws`, private/group chat and basic REPLY/AT formatting
-- WeChat: iLink text long polling, persisted `context_token` and owner restrictions
+BG_CHAT_BASE_URL=
+BG_CHAT_API_KEY=
+BG_CHAT_MODEL=
 
-A generic Vision / STT / TTS helper layer is included. Remaining private-version media details are being restored through generalized implementations rather than copied with private defaults; see `docs/MIGRATION_STATUS.md`.
+VISION_BASE_URL=
+VISION_API_KEY=
+VISION_MODEL=
 
-## Private overlay
+PROACTIVE_BASE_URL=
+PROACTIVE_API_KEY=
+PROACTIVE_MODEL=
 
-A recommended layout is:
+QQ_LLM_BASE_URL=
+QQ_LLM_API_KEY=
+QQ_LLM_MODEL=
+
+WX_LLM_BASE_URL=
+WX_LLM_API_KEY=
+WX_LLM_MODEL=
+```
+
+Channels without their own configuration fall back to the resolved chat model.
+
+### Supabase
+
+```env
+SUPABASE_URL=
+SUPABASE_KEY=
+```
+
+Used for conversation history, memories, threads, reminders, summaries and selected runtime configuration.
+
+### Telegram
+
+```env
+TG_BOT_TOKEN=
+TG_OWNER_ID=
+TG_GROUP_IDS=
+TG_WEBHOOK_SECRET=
+```
+
+### QQ
+
+```env
+QQ_WS_TOKEN=
+QQ_BOT_ID=
+QQ_OWNER_ID=
+QQ_GROUP_IDS=
+```
+
+OneBot v11 WebSocket endpoint:
 
 ```text
-wang-guan-open/       # public engineering layer
-my-private-overlay/   # your private layer
-├─ persona/
-├─ prompts/
-├─ ui/
-├─ tools/
-├─ integrations/
-└─ private-config/
+/qq-ws
 ```
 
-The author's private persona, relationship terms, original MiniApp UI, private memory contents, health/location/schedule data, private MCP services, real IDs/keys/tokens and private household/world data are not included.
+### WeChat
 
-### Secret diary boundary
+```env
+WX_ILINK_TOKEN=
+WX_ILINK_BOT_ID=
+WX_OWNER_ID=
+```
 
-The private version's diary behavior historically existed in more than one place: a tool module, worker tool lists and background `[DIARY]...[/DIARY]` parsers. The public edition therefore does **not** ship the author's secret-diary implementation or automatic diary-writing behavior. Developers may implement their own private diary tool in a private overlay using the public Tool pattern.
+## Extension points
+
+The project is designed to be extended through separate modules instead of growing one large core file.
+
+Typical extension points:
+
+```text
+Context Provider  -> new context sources
+Tool Module       -> new callable tools
+MCP               -> external capabilities
+Platform Adapter  -> additional chat platforms
+Background Task   -> periodic jobs
+MiniApp           -> custom administration features
+```
 
 ## License
 
-PolyForm Noncommercial License 1.0.0. Learning, research, modification and non-commercial deployment/distribution are allowed under the license; commercial sale, paid services and commercial hosting are not.
+PolyForm Noncommercial License 1.0.0.
+
+Learning, research, modification and non-commercial deployment/distribution are allowed. Commercial sale, paid SaaS, paid hosting and other commercial use are outside the license. See `LICENSE` for the full terms.
