@@ -54,7 +54,21 @@ async def reminder_checker(send_callback=None):
                 log.warning("reminder delivery failed id=%s: %s",row.get("id"),exc)
                 ok=False
             if ok:
-                update("reminders",f"id=eq.{row['id']}",{"is_done":True})
+                repeat=(row.get("repeat_type") or "once").strip().lower()
+                if repeat in {"daily","weekly"}:
+                    from dateutil.parser import isoparse
+                    from datetime import timedelta
+                    try:
+                        next_at=isoparse(str(row.get("trigger_at") or ""))
+                        step=timedelta(days=1 if repeat=="daily" else 7)
+                        now_utc=datetime.now(timezone.utc)
+                        while next_at <= now_utc:
+                            next_at += step
+                        update("reminders",f"id=eq.{row['id']}",{"trigger_at":next_at.isoformat(),"is_done":False})
+                    except Exception as exc:
+                        log.warning("failed to reschedule recurring reminder id=%s: %s",row.get("id"),exc)
+                else:
+                    update("reminders",f"id=eq.{row['id']}",{"is_done":True})
 
 async def proactive_loop(send_callback=None):
     while True:
