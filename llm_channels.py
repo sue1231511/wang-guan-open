@@ -9,7 +9,7 @@ from app_config import SUPABASE_URL, SUPABASE_KEY
 
 log = logging.getLogger(__name__)
 _CACHE: dict[str, tuple[float, dict]] = {}
-_LOCK = threading.Lock()
+_LOCK = threading.RLock()
 TTL = 30
 
 CHANNEL_COLUMNS = {
