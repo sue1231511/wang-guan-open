@@ -34,7 +34,7 @@ def _upstream_config():
 
 def _authorized(request: Request) -> bool:
     if not API_SECRET:
-        return True
+        return ALLOW_INSECURE_NO_SECRET
     raw = request.headers.get("authorization", "")
     token = raw.split(" ", 1)[-1].strip() if " " in raw else raw.strip()
     return hmac.compare_digest(token, API_SECRET)
