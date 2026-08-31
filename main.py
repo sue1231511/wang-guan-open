@@ -63,11 +63,28 @@ def _authorized(request: Request) -> bool:
 
 def _inject_system(messages: list) -> list:
     messages = list(messages or [])
-    system_prompt = build_context()
-    if messages and messages[0].get("role") == "system":
-        messages[0] = {**messages[0], "content": system_prompt}
+    gateway_prompt = build_context().strip()
+    if not gateway_prompt:
+        return messages
+
+    if SYSTEM_INJECTION_MODE == "replace":
+        if messages and messages[0].get("role") == "system":
+            messages[0] = {**messages[0], "content": gateway_prompt}
+        else:
+            messages.insert(0, {"role": "system", "content": gateway_prompt})
+        return messages
+
+    system_indexes = [i for i, m in enumerate(messages) if m.get("role") == "system"]
+    if system_indexes:
+        i = system_indexes[0]
+        client_prompt = str(messages[i].get("content") or "").strip()
+        if SYSTEM_INJECTION_MODE == "append":
+            combined = "\n\n".join(x for x in (client_prompt, gateway_prompt) if x)
+        else:
+            combined = "\n\n".join(x for x in (gateway_prompt, client_prompt) if x)
+        messages[i] = {**messages[i], "content": combined}
     else:
-        messages.insert(0, {"role": "system", "content": system_prompt})
+        messages.insert(0, {"role": "system", "content": gateway_prompt})
     return messages
 
 
