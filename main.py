@@ -456,6 +456,24 @@ async def chat_completions(request: Request):
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
+from contextlib import asynccontextmanager
+import asyncio as _asyncio
+
+@asynccontextmanager
+async def _lifespan(app):
+    tasks = []
+    if os.environ.get("WX_ILINK_TOKEN") or os.environ.get("SUPABASE_URL"):
+        try:
+            from wx_bot import async_wx_bot
+            tasks.append(_asyncio.create_task(async_wx_bot()))
+        except Exception:
+            log.exception("failed to start WeChat adapter")
+    yield
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await _asyncio.gather(*tasks, return_exceptions=True)
+
 app = Starlette(routes=[
     Route("/health", health, methods=["GET"]),
     Route("/miniapp", miniapp, methods=["GET"]),
