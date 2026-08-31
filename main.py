@@ -26,12 +26,22 @@ INJECT_PUBLIC_TOOLS = os.environ.get("INJECT_PUBLIC_TOOLS", "0") == "1"
 
 
 def _upstream_config():
+    provider = get_active_provider()
+    if provider:
+        base = str(provider.get("base_url") or "").rstrip("/")
+        keys = provider.get("api_keys") or []
+        key = str(keys[0] if keys else provider.get("api_key") or "")
+        model = str(provider.get("active_model") or provider.get("model") or "")
+        extra_headers = provider.get("extra_headers") or {}
+        if base and key and model:
+            return base, key, model, extra_headers
+
     base = os.environ.get("LLM_BASE_URL", "").rstrip("/")
     key = os.environ.get("LLM_API_KEY", "")
     model = os.environ.get("LLM_MODEL", "")
     if not base or not key or not model:
-        raise RuntimeError("LLM_BASE_URL, LLM_API_KEY and LLM_MODEL are required")
-    return base, key, model
+        raise RuntimeError("Configure an active provider in /miniapp or set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL")
+    return base, key, model, {}
 
 
 def _authorized(request: Request) -> bool:
