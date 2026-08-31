@@ -74,13 +74,29 @@ wang-guan-open
 
 ---
 
-## 3. About `tiantian-wg`
+## 3. Current architecture
 
-An earlier repository named `tiantian-wg` was used for an initial generalization pass. For example, concrete names were replaced with `AI_NAME` and `PARTNER_NAME` configuration.
+The public edition is rebuilt from the latest private-project architecture rather than copied from an older generalized snapshot.
 
-However, that repository still retains a significant amount of relationship-specific prompt design and private-project structure, so it is not suitable for direct publication as-is.
+```text
+container
+├─ main.py
+│  └─ realtime HTTP / OpenAI-compatible gateway
+└─ background_main.py
+   └─ independent background-task process
+```
 
-`wang-guan-open` may reuse engineering implementations from `tiantian-wg` only after they are confirmed to be generic and free of private material.
+Both processes are launched by `entrypoint.sh`. If either exits, the other is stopped as well so the deployment platform can restart the service as one unit instead of leaving a half-dead deployment running.
+
+The public core also keeps several reusable engineering patterns from the latest architecture:
+
+- `bg_executor.py`: bounded shared thread pool for fire-and-forget work
+- `context.py`: registerable Context Provider mechanism
+- `free_tools.py`: Schema / Dispatch aggregation layer for tools
+- `background_tasks.py`: background coroutine registration point
+- `platforms/`: extension boundary for transport adapters
+
+The private deployment's personal behavior layer is intentionally excluded from these structures.
 
 ---
 
