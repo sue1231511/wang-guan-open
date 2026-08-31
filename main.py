@@ -298,9 +298,12 @@ async def chat_completions(request: Request):
             log.exception("internal tool loop failed")
             return JSONResponse({"error": {"message": str(exc)}}, status_code=502)
         if not want_stream:
+            text = _final_text(data)
+            _persist_turn(user_text, text)
             return JSONResponse(data)
 
         text = _final_text(data)
+        _persist_turn(user_text, text)
         async def one_shot_stream():
             if text:
                 chunk = json.dumps({
