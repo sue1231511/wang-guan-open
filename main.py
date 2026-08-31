@@ -9,6 +9,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.routing import Route
+from starlette.middleware.cors import CORSMiddleware
 
 from context import build_context
 from free_tools import TOOL_SCHEMAS
