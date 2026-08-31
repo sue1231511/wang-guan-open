@@ -180,7 +180,7 @@ if CORS_ALLOW_ORIGIN:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[origin.strip() for origin in CORS_ALLOW_ORIGIN.split(",") if origin.strip()],
-        allow_methods=["POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
         allow_credentials=False,
     )
