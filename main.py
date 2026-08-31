@@ -8,11 +8,14 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, StreamingResponse
-from starlette.routing import Route
+from starlette.routing import Route, WebSocketRoute
 from starlette.middleware.cors import CORSMiddleware
 
 from context import build_context
 from free_tools import TOOL_SCHEMAS, TOOL_DISPATCH
+from conversation_store import save_message
+from memory_store import semantic_memory
+from routes_admin import memories as admin_memories, threads as admin_threads, reminders as admin_reminders, trigger_summary, trigger_compress
 from runtime_config import (
     load_config,
     save_config,
@@ -119,6 +122,20 @@ async def health(_: Request):
 
 async def miniapp(_: Request):
     return FileResponse("miniapp/miniapp.html", media_type="text/html")
+
+
+async def telegram_webhook(request: Request):
+    secret = request.headers.get("x-telegram-bot-api-secret-token", "")
+    if API_SECRET and not hmac.compare_digest(secret, API_SECRET[:256]):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        update = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    from telegram_bot import handle_update
+    import asyncio
+    asyncio.create_task(handle_update(update))
+    return JSONResponse({"ok": True})
 
 
 async def admin_config(request: Request):
@@ -246,6 +263,30 @@ def _final_text(data: dict) -> str:
         return ""
 
 
+def _last_user_text(messages: list) -> str:
+    for msg in reversed(messages or []):
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "\n".join(str(p.get("text", "")) for p in content if isinstance(p, dict) and p.get("type") == "text").strip()
+    return ""
+
+
+def _persist_turn(user_text: str, assistant_text: str) -> None:
+    if user_text:
+        save_message("user", user_text, scene="message", source="api")
+    if assistant_text:
+        save_message("assistant", assistant_text, scene="message", source="api")
+    if user_text and assistant_text:
+        try:
+            semantic_memory.add_turn(user_text, assistant_text)
+        except Exception:
+            log.exception("semantic memory write failed")
+
+
 async def chat_completions(request: Request):
     if not _authorized(request):
         return JSONResponse({"error": {"message": "Unauthorized"}}, status_code=401)
@@ -255,7 +296,9 @@ async def chat_completions(request: Request):
     except Exception:
         return JSONResponse({"error": {"message": "Invalid JSON"}}, status_code=400)
 
-    payload["messages"] = _inject_system(payload.get("messages") or [])
+    original_messages = list(payload.get("messages") or [])
+    user_text = _last_user_text(original_messages)
+    payload["messages"] = _inject_system(original_messages)
     want_stream = bool(payload.get("stream", False))
 
     # Only execute tools that this public gateway itself injected. If a client
@@ -269,9 +312,12 @@ async def chat_completions(request: Request):
             log.exception("internal tool loop failed")
             return JSONResponse({"error": {"message": str(exc)}}, status_code=502)
         if not want_stream:
+            text = _final_text(data)
+            _persist_turn(user_text, text)
             return JSONResponse(data)
 
         text = _final_text(data)
+        _persist_turn(user_text, text)
         async def one_shot_stream():
             if text:
                 chunk = json.dumps({
@@ -300,7 +346,10 @@ async def chat_completions(request: Request):
         if resp is None:
             return JSONResponse({"error": {"message": "Upstream returned no response"}}, status_code=502)
         try:
-            return JSONResponse(resp.json(), status_code=resp.status_code)
+            data = resp.json()
+            if resp.status_code < 400:
+                _persist_turn(user_text, _final_text(data))
+            return JSONResponse(data, status_code=resp.status_code)
         except Exception:
             return JSONResponse({"error": {"message": "Upstream returned a non-JSON response"}}, status_code=502)
 
@@ -333,9 +382,56 @@ async def chat_completions(request: Request):
                         }, ensure_ascii=False)
                         yield f"data: {chunk}\n\ndata: [DONE]\n\n".encode("utf-8")
                         return
-                    async for raw in resp.aiter_bytes():
-                        if raw:
-                            yield raw
+                    assistant_buf = []
+                    has_tool_calls = False
+                    in_thinking = False
+                    got_done = False
+                    async for line in resp.aiter_lines():
+                        if not line:
+                            continue
+                        if not line.startswith("data:"):
+                            continue
+                        data_str = line[5:].strip()
+                        if data_str == "[DONE]":
+                            if in_thinking:
+                                close = json.dumps({"choices":[{"index":0,"delta":{"content":"</think>"},"finish_reason":None}]}, ensure_ascii=False)
+                                yield f"data: {close}\n\n".encode("utf-8")
+                            got_done = True
+                            yield b"data: [DONE]\n\n"
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            choice = (chunk.get("choices") or [{}])[0]
+                            delta = choice.get("delta") or {}
+                            if delta.get("tool_calls"):
+                                has_tool_calls = True
+                            reasoning = delta.get("reasoning_content") or ""
+                            content = delta.get("content") or ""
+                            finish_reason = choice.get("finish_reason")
+                            if reasoning:
+                                prefix = "<think>" if not in_thinking else ""
+                                in_thinking = True
+                                rebuilt = {
+                                    "id": chunk.get("id", ""), "object": chunk.get("object", "chat.completion.chunk"),
+                                    "created": chunk.get("created", 0), "model": chunk.get("model", ""),
+                                    "choices": [{"index": 0, "delta": {"content": prefix + reasoning}, "finish_reason": None}],
+                                }
+                                yield f"data: {json.dumps(rebuilt, ensure_ascii=False)}\n\n".encode("utf-8")
+                                continue
+                            if in_thinking and (content or finish_reason):
+                                in_thinking = False
+                                close = json.dumps({"choices":[{"index":0,"delta":{"content":"</think>"},"finish_reason":None}]}, ensure_ascii=False)
+                                yield f"data: {close}\n\n".encode("utf-8")
+                            if content:
+                                assistant_buf.append(content)
+                            yield (line + "\n\n").encode("utf-8")
+                        except Exception:
+                            yield (line + "\n\n").encode("utf-8")
+                    if not got_done:
+                        log.warning("upstream stream ended without [DONE]")
+                    assistant_text = "".join(assistant_buf).strip()
+                    if assistant_text and not has_tool_calls:
+                        _persist_turn(user_text, assistant_text)
                     return
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
                 if runtime_provider and attempt + 1 < tries:
@@ -360,13 +456,38 @@ async def chat_completions(request: Request):
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
+from contextlib import asynccontextmanager
+import asyncio as _asyncio
+
+@asynccontextmanager
+async def _lifespan(app):
+    tasks = []
+    if os.environ.get("WX_ILINK_TOKEN") or os.environ.get("SUPABASE_URL"):
+        try:
+            from wx_bot import async_wx_bot
+            tasks.append(_asyncio.create_task(async_wx_bot()))
+        except Exception:
+            log.exception("failed to start WeChat adapter")
+    yield
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await _asyncio.gather(*tasks, return_exceptions=True)
+
 app = Starlette(routes=[
     Route("/health", health, methods=["GET"]),
     Route("/miniapp", miniapp, methods=["GET"]),
+    Route("/webhook", telegram_webhook, methods=["POST"]),
+    WebSocketRoute("/qq-ws", __import__("qq_bot").websocket_endpoint),
     Route("/admin/config", admin_config, methods=["GET", "PUT"]),
     Route("/admin/context-preview", admin_context_preview, methods=["GET"]),
+    Route("/admin/memories", admin_memories, methods=["GET"]),
+    Route("/admin/threads", admin_threads, methods=["GET"]),
+    Route("/admin/reminders", admin_reminders, methods=["GET"]),
+    Route("/admin/trigger-summary", trigger_summary, methods=["POST"]),
+    Route("/admin/trigger-compress", trigger_compress, methods=["POST"]),
     Route("/v1/chat/completions", chat_completions, methods=["POST"]),
-])
+], lifespan=_lifespan)
 
 if CORS_ALLOW_ORIGIN:
     app.add_middleware(

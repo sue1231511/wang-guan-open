@@ -25,6 +25,7 @@
       <button class="on" data-panel="overview">概览</button>
       <button data-panel="providers">供应商</button>
       <button data-panel="context">Prompt / Context</button>
+      <button data-panel="data">记忆 / 线索 / 提醒</button>
       <button data-panel="tester">对话测试</button>
     </nav>
 
@@ -52,6 +53,13 @@
       <section class="panel" id="context">
         <div class="block"><h2>System Prompt</h2><p class="muted">这里只提供通用 Prompt 编辑能力。私人版的人格、称呼与关系提示词不在公开仓库。</p><div class="field"><textarea id="systemPrompt"></textarea></div><button class="btn primary" onclick="savePrompt()">保存 Prompt</button></div>
         <div class="block"><div class="row"><h2 class="grow">Context 预览</h2><button class="btn" onclick="previewContext()">刷新</button></div><pre id="contextPreview" class="mono">尚未加载</pre></div>
+      </section>
+
+      <section class="panel" id="data">
+        <div class="block"><div class="row"><h2 class="grow">记忆</h2><button class="btn" onclick="loadDataView('memories')">刷新</button></div><p class="muted">展示分层记忆。公开版保留数据结构与管理能力，不包含作者的私人记忆内容。</p><pre id="memoriesView" class="mono">尚未加载</pre></div>
+        <div class="block"><div class="row"><h2 class="grow">悬置线索</h2><button class="btn" onclick="loadDataView('threads')">刷新</button></div><p class="muted">ACTIVE / DORMANT / SILENT 线索机制与后台扫描逻辑保留。</p><pre id="threadsView" class="mono">尚未加载</pre></div>
+        <div class="block"><div class="row"><h2 class="grow">提醒</h2><button class="btn" onclick="loadDataView('reminders')">刷新</button></div><pre id="remindersView" class="mono">尚未加载</pre></div>
+        <div class="block"><h2>后台维护</h2><p class="muted">手动触发与后台进程使用同一套总结 / 压缩实现，方便部署后排查。</p><div class="row"><button class="btn" onclick="runAdminTask('summary')">运行总结与记忆维护</button><button class="btn" onclick="runAdminTask('compress')">运行跨平台压缩</button></div><div id="taskResult" class="muted" style="margin-top:10px"></div></div>
       </section>
 
       <section class="panel" id="tester">
@@ -97,7 +105,9 @@ async function saveProviderEditor(){try{const name=$('pName').value.trim(),base_
 async function activateProvider(id){CFG.active_provider_id=id;await persist()}
 async function deleteProvider(id){if(!confirm('删除这个供应商？'))return;CFG.providers=CFG.providers.filter(p=>String(p.id)!==String(id));if(String(CFG.active_provider_id)===String(id))CFG.active_provider_id=null;await persist()}
 async function savePrompt(){CFG.system_prompt=$('systemPrompt').value;await persist();alert('已保存')}
-async function previewContext(){try{const d=await req('/admin/context-preview');$('contextPreview').textContent=d.context||''}catch(e){$('contextPreview').textContent=e.message}}
+async function previewContext(){try{const d=await req('/admin/context-preview');$('contextPreview').textContent=d.context||d.content||''}catch(e){$('contextPreview').textContent=e.message}}
+async function loadDataView(kind){const box=$(kind+'View');box.textContent='加载中…';try{const d=await req('/admin/'+kind);box.textContent=JSON.stringify(d.items||[],null,2)}catch(e){box.textContent=e.message}}
+async function runAdminTask(kind){const map={summary:'/admin/trigger-summary',compress:'/admin/trigger-compress'};$('taskResult').textContent='执行中…';try{const d=await req(map[kind],{method:'POST',body:'{}'});$('taskResult').textContent=d.ok?'完成':'失败：'+JSON.stringify(d)}catch(e){$('taskResult').textContent='失败：'+e.message}}
 function exportConfig(){const blob=new Blob([JSON.stringify(CFG,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='gateway-config.json';a.click();URL.revokeObjectURL(a.href)}
 async function importConfig(file){if(!file)return;try{const data=JSON.parse(await file.text());CFG=data;await persist()}catch(e){alert('导入失败：'+e.message)}}
 function renderChat(){ $('chatLog').innerHTML=chatMessages.map(m=>`<div class="msg"><b>${esc(m.role)}</b>${esc(m.content)}</div>`).join('');$('chatLog').scrollTop=$('chatLog').scrollHeight }
