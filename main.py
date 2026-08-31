@@ -128,7 +128,7 @@ async def miniapp(_: Request):
 
 async def telegram_webhook(request: Request):
     secret = request.headers.get("x-telegram-bot-api-secret-token", "")
-    if API_SECRET and not hmac.compare_digest(secret, API_SECRET[:256]):
+    if not TG_WEBHOOK_SECRET or not hmac.compare_digest(secret, TG_WEBHOOK_SECRET):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     try:
         update = await request.json()
