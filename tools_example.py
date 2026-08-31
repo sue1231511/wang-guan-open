@@ -1,7 +1,7 @@
-"""Example tool module.
+"""Example public tool module.
 
-This demonstrates the public tool contract without publishing any of the
-private project's real tool implementations.
+A tool domain contains implementation + SCHEMAS + DISPATCH. Private tool services
+from the author's deployment are not distributed in this repository.
 """
 
 
@@ -14,7 +14,7 @@ SCHEMAS = [
         "type": "function",
         "function": {
             "name": "echo",
-            "description": "Return the provided text. Example tool only.",
+            "description": "Return the supplied text. Example tool for extension.",
             "parameters": {
                 "type": "object",
                 "properties": {"text": {"type": "string"}},
@@ -24,7 +24,4 @@ SCHEMAS = [
     }
 ]
 
-
-DISPATCH = {
-    "echo": lambda args: echo(args.get("text", "")),
-}
+DISPATCH = {"echo": lambda args: echo(args.get("text", ""))}
