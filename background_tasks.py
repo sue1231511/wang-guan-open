@@ -110,4 +110,11 @@ async def platform_compress_loop():
             if len(rows)>=100: await asyncio.to_thread(run_platform_batch_compress)
         except Exception as exc:log.warning("platform compress failed: %s",exc)
 
-REGISTERED_TASKS=[reminder_checker,summary_loop,platform_compress_loop]
+async def platform_maintenance_loop():
+    while True:
+        await asyncio.sleep(6*3600)
+        try:
+            await asyncio.to_thread(run_platform_summary_maintenance)
+        except Exception as exc:log.warning("platform maintenance failed: %s",exc)
+
+REGISTERED_TASKS=[reminder_checker,summary_loop,platform_compress_loop,platform_maintenance_loop]
