@@ -1,58 +1,70 @@
 # Wang Guan Open
 
-`wang-guan-open` 是从我自己的私人 AI 网关项目中剥离出来的公开版本。
+> [English](README_EN.md)
 
-原项目长期用于个人 AI 陪伴、跨平台聊天、记忆、上下文同步、后台任务与工具调用，因此内部包含大量只属于我自己的内容：私人 UI、人格提示词、关系设定、专属称呼、生活数据、设备状态、个人记忆、私人 MCP/工具、服务地址与自动化逻辑等。
+`wang-guan-open` 是从私人 AI 网关项目中剥离出的**源码公开版**。
 
-这些内容不会公开。
+它公开的是通用工程结构、接口设计与扩展方式，不包含原私人项目中的人格、关系设定、专属 UI、私人记忆、生活数据、私有工具和服务配置。
 
-这个仓库保留的是项目中可以复用的工程结构、接口形式和扩展思路，方便其他人基于它搭建自己的版本，而不是复制我的私人 AI。
-
----
-
-## 这个仓库是什么
-
-它是一个可自行扩展的 AI 网关骨架，核心目标是把多个能力集中到一个统一服务中，例如：
-
-- 提供 OpenAI 兼容的 `/v1/chat/completions` 接口
-- 接入任意 OpenAI-Compatible LLM 服务
-- 动态构建 system context
-- 自定义人格与提示词
-- 扩展 Function Calling / Tool Calling
-- 增加后台定时任务或自主任务
-- 挂载自己的管理页面 / MiniApp
-- 继续扩展数据库、记忆、机器人平台等功能
-
-公开版不会预设“AI 应该是谁”，也不会预设“用户是谁”。
-
-你可以把它改造成自己的 AI 助手、陪伴型 AI、聊天机器人网关或其他长期运行的 Agent 服务。
+**本项目不是 OSI 定义下的 Open Source Software。** 代码采用 PolyForm Noncommercial License 1.0.0，仅允许非商业用途。禁止将本项目或其衍生版本用于收费销售、商业化服务或其他商业用途。详见 `LICENSE`。
 
 ---
 
-## 与私人完整版的关系
+## 1. 项目定位
 
-我实际使用的版本位于另一个私人仓库中，并持续维护。
+这是一个可自行扩展的 AI 网关骨架，适合用于搭建长期运行的个人 AI、陪伴型 AI、聊天机器人网关或 Agent 服务。
 
-公开仓库不是私人仓库的镜像，也不会保持文件一比一对应。
+目前公开版保留的方向包括：
 
-两者关系更接近：
+- OpenAI 兼容 `/v1/chat/completions` 接口
+- OpenAI-Compatible 上游模型接入
+- 动态 system context 组装
+- Prompt 扩展接口
+- Function Calling / Tool Calling 扩展范式
+- 后台任务与自主任务结构
+- MiniApp / 管理页面挂载方式
+- 私有 Overlay 分层思路
+
+公开版不会预设 AI 必须叫什么，也不会预设使用者是谁、双方是什么关系。
+
+---
+
+## 2. 与私人完整版的关系
+
+私人完整版长期用于实际个人场景，内部包含大量只属于原作者本人的内容，例如：
+
+- 私人人格 Prompt
+- 专属关系设定与称呼
+- 私人聊天规则
+- 原始 MiniApp UI / CSS / JavaScript
+- 私人长期记忆与日记
+- 设备、位置、健康、排班等生活数据
+- 私人邮件联系人
+- 家庭、宠物、世界观数据
+- 私有 MCP / API 服务
+- 私人工具实现
+- Bot ID、群 ID、Token、Key 等配置
+
+这些内容**不会进入公开仓库**。
+
+本仓库不是私人仓库的镜像，也不会保持一比一文件对应。更准确地说，它是从私人项目中抽离出的公共工程层。
 
 ```text
 私人完整版
-├─ 通用网关架构
+├─ 网关核心
 ├─ 上下文系统
-├─ 后台任务系统
+├─ 后台任务
 ├─ 工具系统
 ├─ 私人人格 / Prompt
 ├─ 私人 UI
 ├─ 私人生活数据
-├─ 私人服务与 MCP
-└─ 大量个人定制逻辑
+├─ 私有服务
+└─ 个人定制逻辑
 
-        ↓ 剥离所有私人内容
+        ↓ 仅保留可公开部分
 
 wang-guan-open
-├─ 通用网关骨架
+├─ 通用网关结构
 ├─ Context 扩展接口
 ├─ Prompt 示例
 ├─ Tool 扩展范式
@@ -60,51 +72,29 @@ wang-guan-open
 └─ MiniApp 挂载示例
 ```
 
-我以前还维护过一版用于整理项目结构的仓库 `tiantian-wg`。那一版更接近当时私人项目的完整代码结构，也留下了不少个人定制内容。
+---
 
-这次的 `wang-guan-open` 采取更严格的边界：只公开可以复用的实现思路，不继续公开我的私人 AI 本身。
+## 3. 关于 `tiantian-wg`
+
+此前还存在一版 `tiantian-wg`，它曾用于把私人项目做初步泛化，例如把具体姓名替换成 `AI_NAME` / `PARTNER_NAME`。
+
+但那一版仍保留了较多私人项目的结构和关系型提示词，因此不会直接作为公开仓库发布。
+
+`wang-guan-open` 会参考其中已经泛化过、且确认不含私人内容的工程实现，把真正通用的能力逐步迁移回来，而不是直接复制整个仓库。
 
 ---
 
-## 为什么没有直接把原仓库公开
+## 4. OpenAI 兼容网关
 
-因为这个项目并不是一开始按照“开源软件”设计的。
-
-它在长期使用过程中逐渐混入了大量个人生活信息和专属逻辑。如果直接把原仓库删几个 Key 就公开，很容易留下：
-
-- 私人名字与称呼
-- AI 与我的关系设定
-- 完整人格 Prompt
-- 私人聊天规则
-- 私人 UI 设计
-- 个人设备、位置、排班、健康等数据结构
-- 私人记忆与日记逻辑
-- 私人邮箱联系人
-- 私人 MCP / API 服务
-- 私人机器人 ID、群 ID、频道配置
-- 开发过程中曾出现过的历史配置
-
-所以这个仓库不是通过“复制后删除”生成，而是重新建立了一套干净的公开骨架。
-
-这也意味着：原私人仓库的 Git 历史不会出现在这里。
-
----
-
-## 已保留的内容
-
-当前公开版主要保留以下通用部分。
-
-### OpenAI 兼容网关
-
-提供：
+公开版提供：
 
 ```text
 POST /v1/chat/completions
 ```
 
-可接入 OpenAI-Compatible 上游模型。
+可接入任意兼容 OpenAI Chat Completions 格式的上游模型。
 
-主要配置：
+基础环境变量：
 
 ```env
 API_SECRET=change-me
@@ -113,211 +103,7 @@ LLM_API_KEY=your-key
 LLM_MODEL=your-model
 ```
 
----
-
-### Context Builder
-
-`context.py` 提供上下文组装入口。
-
-公开版只提供通用范式，例如：
-
-```python
-def build_context() -> str:
-    return "Your system context here"
-```
-
-你可以自行接入：
-
-- 数据库
-- 用户画像
-- 长期记忆
-- 对话摘要
-- 时间信息
-- 日历
-- 设备状态
-- 自定义业务数据
-
-私人完整版中的个人 Context 读取逻辑不会公开。
-
----
-
-### Prompt
-
-`prompts.py` 中只保留泛化示例。
-
-不会公开：
-
-- 我的 AI 人格原文
-- 私人关系设定
-- 专属称呼
-- 自由活动 Prompt
-- 私人日记 / 总结 Prompt
-- 我的行为偏好与互动规则
-
-建议把自己的 Prompt 放在：
-
-- 环境变量
-- 私有数据库
-- 私有配置文件
-- 私有 Overlay 仓库
-
-而不是直接硬编码到公开仓库。
-
----
-
-### Tool 扩展方式
-
-私人完整版拥有较多工具与外部服务接入，这些实现不在公开范围内。
-
-公开版只保留工具的标准写法。
-
-一个工具模块通常包含三部分：
-
-```python
-def example_tool(text: str) -> str:
-    return text
-
-SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "example_tool",
-            "description": "Example tool",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string"}
-                },
-                "required": ["text"]
-            }
-        }
-    }
-]
-
-DISPATCH = {
-    "example_tool": lambda args: example_tool(args["text"])
-}
-```
-
-再由 `free_tools.py` 统一聚合。
-
-你可以按照这个模式自行创建：
-
-```text
-tools_weather.py
-tools_search.py
-tools_calendar.py
-tools_memory.py
-tools_xxx.py
-```
-
-具体调用什么服务，由你自己决定。
-
----
-
-### Background Tasks
-
-`background_main.py` 保留后台任务的基本组织方式。
-
-可以用于：
-
-- 定时总结
-- 记忆整理
-- 定时检查
-- Agent 自主任务
-- 数据同步
-- 消息轮询
-
-私人完整版中的具体自主行为逻辑不会公开。
-
----
-
-## MiniApp / UI
-
-这里需要单独说明。
-
-私人完整版拥有我自己长期设计和修改的 MiniApp UI，包括页面结构、组件、交互和视觉方案。
-
-**这些 UI 不属于本开源项目的一部分。**
-
-因此：
-
-```text
-miniapp/miniapp.html
-```
-
-只保留一个最小占位示例，用于说明如何通过网关挂载自己的页面。
-
-请自行设计自己的前端。
-
-这不是缺文件，也不是待补全功能，而是有意不公开。
-
----
-
-## 明确不会公开的内容
-
-包括但不限于：
-
-- 原始 MiniApp HTML / CSS / JavaScript
-- 原始视觉设计与组件
-- 私人人格 Prompt
-- AI 与我的私人关系设定
-- 私人称呼、名字、身份锚点
-- 私人聊天历史
-- 私人长期记忆
-- 私人日记
-- 私人生活数据
-- 设备状态 / 定位 / 健康 / 排班等个人数据逻辑
-- 私人邮件联系人
-- 私人家庭 / 宠物 / 世界观数据
-- 私人自由活动规则
-- 私有 MCP 服务
-- 私人工具实现
-- Token / API Key / Bot ID / 群 ID
-- 私有数据库内容
-- 仅服务于我个人使用习惯的自动化逻辑
-
-如果公开版中出现类似能力，只会提供通用接口或示例写法。
-
----
-
-## 推荐的二开方式
-
-如果你准备长期维护自己的版本，建议不要直接把私人内容写回这个公开仓库。
-
-比较推荐：
-
-```text
-wang-guan-open        # 公共核心
-
-my-private-config     # 你自己的私有层
-├─ persona
-├─ prompts
-├─ ui
-├─ tools
-├─ integrations
-└─ private config
-```
-
-也可以通过环境变量、数据库和挂载目录实现同样的隔离。
-
-仓库里提供了：
-
-```text
-PRIVATE_OVERLAY.example.md
-```
-
-用于说明这种拆分方式。
-
----
-
-## 快速运行
-
-```bash
-cp .env.example .env
-```
-
-填写自己的模型配置后：
+运行：
 
 ```bash
 pip install -r requirements.txt
@@ -330,26 +116,187 @@ python main.py
 0.0.0.0:8000
 ```
 
-然后使用：
+---
 
-```text
-POST /v1/chat/completions
+## 5. Context Builder
+
+`context.py` 提供 system context 的扩展入口。
+
+最小写法：
+
+```python
+def build_context() -> str:
+    return "Your system context here"
 ```
 
-即可调用。
+你可以自行加入：
+
+- 人格配置
+- 用户画像
+- 长期记忆
+- 对话摘要
+- 时间与日历
+- 数据库状态
+- 自定义业务信息
+
+私人完整版中的个人 Context 查询与注入逻辑不会公开。
+
+建议把真正私密的数据存放在环境变量、私有数据库或独立私有配置层中。
 
 ---
 
-## 项目原则
+## 6. Prompt
 
-这个仓库公开的是“怎么搭”，不是“把我的 AI 拿走”。
+`prompts.py` 只提供泛化示例和模板写法。
 
-代码结构和工程经验可以复用，但人格、关系、UI、记忆与私人生活数据应该属于各自的使用者。
+不会公开原私人项目中的：
 
-如果你基于这个项目二开，建议也把公共核心和私人配置分开维护。以后想开源、迁移或分享时，会省掉很多麻烦。
+- 人格原文
+- 专属称呼
+- 双方关系设定
+- 自由活动 Prompt
+- 私人总结 / 日记 Prompt
+- 私人行为规则
+
+推荐使用占位符或环境变量：
+
+```python
+AI_NAME = os.environ.get("AI_NAME", "AI")
+USER_NAME = os.environ.get("USER_NAME", "User")
+```
+
+不要把真实私人内容直接提交到公开仓库。
 
 ---
 
-## License
+## 7. Tool 扩展方式
 
-MIT License。详见 `LICENSE`。
+私人完整版拥有大量外部工具和服务接入，这些具体实现不会公开。
+
+公开版只保留工具开发范式：
+
+```python
+def example_tool(text: str) -> str:
+    return text
+
+SCHEMAS = [{
+    "type": "function",
+    "function": {
+        "name": "example_tool",
+        "description": "Example tool",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"}
+            },
+            "required": ["text"]
+        }
+    }
+}]
+
+DISPATCH = {
+    "example_tool": lambda args: example_tool(args["text"])
+}
+```
+
+再由 `free_tools.py` 统一聚合。
+
+你可以按同一结构创建自己的：
+
+```text
+tools_weather.py
+tools_search.py
+tools_calendar.py
+tools_memory.py
+tools_xxx.py
+```
+
+---
+
+## 8. Background Tasks
+
+`background_main.py` 保留后台任务的基本组织形式，可用于：
+
+- 定时总结
+- 记忆整理
+- 数据同步
+- 定时检查
+- Agent 自主任务
+- 消息轮询
+
+私人完整版中的具体自主行为、生活逻辑与私人自动化不会公开。
+
+---
+
+## 9. MiniApp / UI
+
+私人完整版中的 MiniApp 是原作者长期自行设计和修改的私人 UI。
+
+**原始 HTML、CSS、JavaScript、页面结构、组件和视觉方案均不属于本公开项目。**
+
+因此公开仓库只保留一个最小挂载示例，用于说明如何通过网关提供自己的管理页面。
+
+```text
+miniapp/miniapp.html
+```
+
+请自行设计前端。
+
+这不是缺失文件，也不是待补全功能，而是明确的公开边界。
+
+---
+
+## 10. 推荐的私人 Overlay 结构
+
+建议把公共核心和私人层分开维护：
+
+```text
+wang-guan-open/        # 源码公开的公共核心
+
+my-private-overlay/    # 你自己的私有仓库
+├─ persona/
+├─ prompts/
+├─ ui/
+├─ tools/
+├─ integrations/
+└─ private-config/
+```
+
+仓库中的 `PRIVATE_OVERLAY.example.md` 提供了一个简单示例。
+
+这种结构可以避免未来分享代码时反复做隐私清理。
+
+---
+
+## 11. 许可协议
+
+本项目采用 **PolyForm Noncommercial License 1.0.0**。
+
+允许：
+
+- 个人学习与研究
+- 非商业部署
+- 修改源码
+- 制作非商业衍生版本
+- 在遵守协议的前提下分发非商业版本
+
+不允许：
+
+- 将本项目或衍生版本收费售卖
+- 将其作为付费产品的一部分提供
+- 以本项目为基础提供收费 SaaS / 托管服务
+- 其他以商业获利为目的的使用
+
+需要商业授权，请先取得作者单独许可。
+
+注意：由于协议限制商业用途，本项目属于 **source-available（源码公开）**，而不是 OSI 定义下的 Open Source Software。
+
+完整法律文本以 `LICENSE` 为准。
+
+---
+
+## 12. 项目原则
+
+这个仓库公开的是“怎么搭”，不是“把我的私人 AI 拿走”。
+
+工程结构可以参考和二次开发，但原作者的人格、关系、UI、记忆、私人数据与服务边界不会随代码一并公开。
