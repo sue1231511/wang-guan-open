@@ -74,13 +74,29 @@ wang-guan-open
 
 ---
 
-## 3. 关于 `tiantian-wg`
+## 3. 当前架构
 
-此前还存在一版 `tiantian-wg`，它曾用于把私人项目做初步泛化，例如把具体姓名替换成 `AI_NAME` / `PARTNER_NAME`。
+公开版已经按私人项目的最新工程结构重新整理，而不是基于旧版本直接复制。
 
-但那一版仍保留了较多私人项目的结构和关系型提示词，因此不会直接作为公开仓库发布。
+```text
+容器
+├─ main.py
+│  └─ HTTP / OpenAI-Compatible 实时网关
+└─ background_main.py
+   └─ 独立后台任务进程
+```
 
-`wang-guan-open` 会参考其中已经泛化过、且确认不含私人内容的工程实现，把真正通用的能力逐步迁移回来，而不是直接复制整个仓库。
+两个进程通过 `entrypoint.sh` 同时启动。任意一个退出时，容器会结束另一个进程，由部署平台统一重启，避免出现只剩半套服务还在运行的状态。
+
+同时保留最新版工程中的几个通用设计：
+
+- `bg_executor.py`：有限大小的共享线程池，避免 fire-and-forget 任务无限创建系统线程
+- `context.py`：可注册的 Context Provider 机制
+- `free_tools.py`：工具 Schema / Dispatch 聚合层
+- `background_tasks.py`：后台协程注册入口
+- `platforms/`：平台传输层的扩展边界
+
+私人项目中的具体行为逻辑不会随这些结构一起公开。
 
 ---
 
