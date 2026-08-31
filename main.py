@@ -278,6 +278,8 @@ def _last_user_text(messages: list) -> str:
 
 
 def _persist_turn(user_text: str, assistant_text: str) -> None:
+    if not PERSIST_CONVERSATIONS:
+        return
     if user_text:
         save_message("user", user_text, scene="message", source="api")
     if assistant_text:
