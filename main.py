@@ -487,7 +487,7 @@ app = Starlette(routes=[
     Route("/admin/trigger-summary", trigger_summary, methods=["POST"]),
     Route("/admin/trigger-compress", trigger_compress, methods=["POST"]),
     Route("/v1/chat/completions", chat_completions, methods=["POST"]),
-])
+], lifespan=_lifespan)
 
 if CORS_ALLOW_ORIGIN:
     app.add_middleware(
