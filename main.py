@@ -97,6 +97,7 @@ async def chat_completions(request: Request):
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        **{str(k): str(v) for k, v in (extra_headers or {}).items()},
     }
     target = f"{base}/chat/completions"
 
