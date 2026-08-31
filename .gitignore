@@ -12,3 +12,4 @@ venv/
 private/
 secrets/
 local_config.py
+data/runtime_config.json
