@@ -308,7 +308,12 @@ async def chat_completions(request: Request):
     # Only execute tools that this public gateway itself injected. If a client
     # supplied its own tools, the gateway remains a transparent proxy and leaves
     # execution to that client.
-    internal_tools = bool(INJECT_PUBLIC_TOOLS and TOOL_SCHEMAS and not payload.get("tools"))
+    internal_tools = bool(
+        INJECT_PUBLIC_TOOLS
+        and TOOL_SCHEMAS
+        and not payload.get("tools")
+        and not payload.get("tool_choice")
+    )
     if internal_tools:
         try:
             data = await _run_internal_tools(payload)
