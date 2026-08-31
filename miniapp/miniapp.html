@@ -55,6 +55,13 @@
         <div class="block"><div class="row"><h2 class="grow">Context 预览</h2><button class="btn" onclick="previewContext()">刷新</button></div><pre id="contextPreview" class="mono">尚未加载</pre></div>
       </section>
 
+      <section class="panel" id="data">
+        <div class="block"><div class="row"><h2 class="grow">记忆</h2><button class="btn" onclick="loadDataView('memories')">刷新</button></div><p class="muted">展示分层记忆。公开版保留数据结构与管理能力，不包含作者的私人记忆内容。</p><pre id="memoriesView" class="mono">尚未加载</pre></div>
+        <div class="block"><div class="row"><h2 class="grow">悬置线索</h2><button class="btn" onclick="loadDataView('threads')">刷新</button></div><p class="muted">ACTIVE / DORMANT / SILENT 线索机制与后台扫描逻辑保留。</p><pre id="threadsView" class="mono">尚未加载</pre></div>
+        <div class="block"><div class="row"><h2 class="grow">提醒</h2><button class="btn" onclick="loadDataView('reminders')">刷新</button></div><pre id="remindersView" class="mono">尚未加载</pre></div>
+        <div class="block"><h2>后台维护</h2><p class="muted">手动触发与后台进程使用同一套总结 / 压缩实现，方便部署后排查。</p><div class="row"><button class="btn" onclick="runAdminTask('summary')">运行总结与记忆维护</button><button class="btn" onclick="runAdminTask('compress')">运行跨平台压缩</button></div><div id="taskResult" class="muted" style="margin-top:10px"></div></div>
+      </section>
+
       <section class="panel" id="tester">
         <div class="block"><h2>流式对话测试</h2><p class="muted">直接调用当前网关的 <code>/v1/chat/completions</code>，用于确认供应商、模型、Prompt 和 SSE 流是否工作。</p><div class="chat" id="chatLog"></div><div class="field"><textarea id="chatInput" placeholder="输入测试消息"></textarea></div><div class="row"><button class="btn primary" onclick="sendTest()">发送</button><button class="btn" onclick="clearChat()">清空</button></div></div>
       </section>
