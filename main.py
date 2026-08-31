@@ -282,7 +282,9 @@ async def chat_completions(request: Request):
     except Exception:
         return JSONResponse({"error": {"message": "Invalid JSON"}}, status_code=400)
 
-    payload["messages"] = _inject_system(payload.get("messages") or [])
+    original_messages = list(payload.get("messages") or [])
+    user_text = _last_user_text(original_messages)
+    payload["messages"] = _inject_system(original_messages)
     want_stream = bool(payload.get("stream", False))
 
     # Only execute tools that this public gateway itself injected. If a client
