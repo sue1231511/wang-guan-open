@@ -28,7 +28,6 @@ async def call_llm(messages:list,max_tokens:int=4096,tools:list|None=None,extra_
             async with client.stream("POST",cfg["base_url"]+"/chat/completions",headers=headers,json=payload) as resp:
                 if resp.status_code>=400:
                     body=(await resp.aread()).decode(errors="ignore")[:500]
-                    record_result(cfg.get("config_id"),False,channel)
                     raise RuntimeError(f"Upstream HTTP {resp.status_code}: {body}")
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):continue
