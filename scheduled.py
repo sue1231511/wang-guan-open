@@ -1,6 +1,6 @@
 """Public summary, rolling-context, memory-refresh and thread maintenance tasks."""
 from __future__ import annotations
-import json, re, logging
+import json, re, logging, threading
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import prompts
@@ -9,6 +9,7 @@ from app_config import DEFAULT_TIMEZONE, AI_NAME, USER_NAME
 
 log=logging.getLogger(__name__)
 TZ=ZoneInfo(DEFAULT_TIMEZONE)
+_PLATFORM_LOCK=threading.Lock()
 
 
 def _llm(system,user,max_tokens=4000):
@@ -72,20 +73,75 @@ def run_thread_scan():
 
 
 def run_platform_batch_compress(limit=100):
-    rows=[]
-    for q in ("type=eq.message","type=eq.wx_message","type=like.group_*"):
-        rows += get("chat_context",f"{q}&order=seq.asc&limit={limit}&select=id,type,role,content,seq,created_at")
-    rows=sorted(rows,key=lambda r:r.get("seq",0))[:limit]
-    if not rows:return
-    lines=[]
-    for r in rows:
-        scene="private" if r.get("type")=="message" else ("wechat" if r.get("type")=="wx_message" else "group")
-        lines.append(f"[{scene}] {r.get('role')}: {r.get('content','')}")
-    now=datetime.now(TZ)
-    summary=_llm("Summarize cross-platform context faithfully.",prompts.PLATFORM_BATCH_SUMMARY.format(content="\n".join(lines),taboo_instruction="",period_start="",period_end=now.isoformat()),8000)
-    if not summary:return
-    insert("platform_rolling_summary",{"content":summary,"source_platforms":"public-adapters","period_start":(rows[0].get("created_at") or now.isoformat()),"period_end":now.isoformat()})
-    delete_ids("chat_context",[r["id"] for r in rows if r.get("id") is not None])
+    if not _PLATFORM_LOCK.acquire(blocking=False):return
+    try:
+        rows=[]
+        for q in ("type=eq.message","type=eq.wx_message","type=like.group_*"):
+            rows += get("chat_context",f"{q}&order=seq.asc&limit={limit}&select=id,type,role,content,seq,created_at")
+        rows=sorted(rows,key=lambda r:r.get("seq",0))[:limit]
+        if not rows:return
+        lines=[]
+        for r in rows:
+            scene="private" if r.get("type")=="message" else ("wechat" if r.get("type")=="wx_message" else "group")
+            lines.append(f"[{scene}] {r.get('role')}: {r.get('content','')}")
+        now=datetime.now(TZ)
+        summary=_llm("Summarize cross-platform context faithfully.",prompts.PLATFORM_BATCH_SUMMARY.format(content="\n".join(lines),taboo_instruction="",period_start=(rows[0].get("created_at") or ""),period_end=now.isoformat()),8000)
+        if not summary:return
+        insert("platform_rolling_summary",{"content":summary,"source_platforms":"public-adapters","period_start":(rows[0].get("created_at") or now.isoformat()),"period_end":now.isoformat()})
+        delete_ids("chat_context",[r["id"] for r in rows if r.get("id") is not None])
+    finally:
+        _PLATFORM_LOCK.release()
+
+
+def _extract_platform_memories(rows:list) -> int:
+    if not rows:return 0
+    fresh=rows[1:] if len(rows)>1 else rows
+    content="\n\n---\n\n".join((r.get("content") or "").strip() for r in fresh if (r.get("content") or "").strip())
+    if not content:return 0
+    existing=get("memories","memory_layer=eq.long_term&order=id.desc&limit=30&select=content,category")
+    existing_text="\n".join(f"- [{r.get('category','')}] {r.get('content','')}" for r in existing) or "(none)"
+    raw=_llm("Return valid JSON only.",prompts.PLATFORM_MEMORY_EXTRACT.format(content=content,existing_memories=existing_text),6000)
+    try:
+        m=re.search(r'\{.*\}',raw,re.S); data=json.loads(m.group(0)) if m else {}; items=data.get("memories",[])
+    except Exception:return 0
+    written=0
+    for item in items:
+        text=(item.get("content") or "").strip()
+        if not text:continue
+        try: importance=max(1,min(int(item.get("importance",3)),5))
+        except Exception: importance=3
+        body={"content":text,"memory_layer":"long_term","importance":importance}
+        category=(item.get("category") or "").strip()
+        if category:body["category"]=category
+        insert("memories",body);written+=1
+    return written
+
+
+def run_platform_summary_maintenance(window_days=30):
+    if not _PLATFORM_LOCK.acquire(blocking=False):return
+    try:
+        rows=get("platform_rolling_summary","order=id.asc&select=id,content,source_platforms,period_start,period_end")
+        if not rows:return
+        cutoff=datetime.now(TZ)-timedelta(days=window_days)
+        old=[]; recent=[]
+        for row in rows:
+            raw=row.get("period_start") or ""
+            try: dt=datetime.fromisoformat(raw.replace("Z","+00:00")); dt=dt.astimezone(TZ) if dt.tzinfo else dt.replace(tzinfo=TZ)
+            except Exception: dt=datetime.now(TZ)
+            (old if dt<cutoff else recent).append(row)
+        if old:delete_ids("platform_rolling_summary",[r["id"] for r in old if r.get("id") is not None])
+        if not recent:return
+        try:_extract_platform_memories(recent)
+        except Exception:log.exception("platform memory extraction failed")
+        if len(recent)<=1:return
+        combined="\n\n---\n\n".join(f"[{r.get('period_start','')} ~ {r.get('period_end','')}]\n{r.get('content','')}" for r in recent)
+        merged=_llm("Merge rolling summaries faithfully.",prompts.PLATFORM_SUMMARY_MERGE.format(content=combined,taboo_instruction="",current_time=datetime.now(TZ).isoformat()),12000)
+        if not merged:return
+        starts=[r.get("period_start") for r in recent if r.get("period_start")]; ends=[r.get("period_end") for r in recent if r.get("period_end")]
+        insert("platform_rolling_summary",{"content":merged,"source_platforms":"public-adapters","period_start":min(starts) if starts else datetime.now(TZ).isoformat(),"period_end":max(ends) if ends else datetime.now(TZ).isoformat()})
+        delete_ids("platform_rolling_summary",[r["id"] for r in recent if r.get("id") is not None])
+    finally:
+        _PLATFORM_LOCK.release()
 
 
 def run_nightly_summary(target_date=None):
