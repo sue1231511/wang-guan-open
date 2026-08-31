@@ -146,6 +146,15 @@ app = Starlette(routes=[
     Route("/v1/chat/completions", chat_completions, methods=["POST"]),
 ])
 
+if CORS_ALLOW_ORIGIN:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[origin.strip() for origin in CORS_ALLOW_ORIGIN.split(",") if origin.strip()],
+        allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+        allow_credentials=False,
+    )
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
