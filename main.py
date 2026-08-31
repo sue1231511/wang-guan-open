@@ -332,7 +332,10 @@ async def chat_completions(request: Request):
         if resp is None:
             return JSONResponse({"error": {"message": "Upstream returned no response"}}, status_code=502)
         try:
-            return JSONResponse(resp.json(), status_code=resp.status_code)
+            data = resp.json()
+            if resp.status_code < 400:
+                _persist_turn(user_text, _final_text(data))
+            return JSONResponse(data, status_code=resp.status_code)
         except Exception:
             return JSONResponse({"error": {"message": "Upstream returned a non-JSON response"}}, status_code=502)
 
