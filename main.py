@@ -80,7 +80,7 @@ async def chat_completions(request: Request):
         return JSONResponse({"error": {"message": "Invalid JSON"}}, status_code=400)
 
     try:
-        base, api_key, model = _upstream_config()
+        base, api_key, model, extra_headers = _upstream_config()
     except RuntimeError as exc:
         return JSONResponse({"error": {"message": str(exc)}}, status_code=500)
 
