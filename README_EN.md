@@ -119,6 +119,10 @@ LLM_API_KEY=your-key
 LLM_MODEL=your-model
 ```
 
+> **Always set `API_SECRET` for any public deployment.** When it is empty, the public build rejects `/v1/chat/completions` by default. Unauthenticated access is only enabled when `ALLOW_INSECURE_NO_SECRET=1` is explicitly set, and that option is intended for local testing only. Otherwise, exposing the service publicly can let anyone consume your upstream model quota.
+>
+> Cross-origin browser access is disabled by default. Set `CORS_ALLOW_ORIGIN` only when needed, using one or more trusted origins separated by commas. Avoid `*` on public deployments.
+
 Run locally:
 
 ```bash
