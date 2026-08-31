@@ -105,7 +105,9 @@ async function saveProviderEditor(){try{const name=$('pName').value.trim(),base_
 async function activateProvider(id){CFG.active_provider_id=id;await persist()}
 async function deleteProvider(id){if(!confirm('删除这个供应商？'))return;CFG.providers=CFG.providers.filter(p=>String(p.id)!==String(id));if(String(CFG.active_provider_id)===String(id))CFG.active_provider_id=null;await persist()}
 async function savePrompt(){CFG.system_prompt=$('systemPrompt').value;await persist();alert('已保存')}
-async function previewContext(){try{const d=await req('/admin/context-preview');$('contextPreview').textContent=d.context||''}catch(e){$('contextPreview').textContent=e.message}}
+async function previewContext(){try{const d=await req('/admin/context-preview');$('contextPreview').textContent=d.context||d.content||''}catch(e){$('contextPreview').textContent=e.message}}
+async function loadDataView(kind){const box=$(kind+'View');box.textContent='加载中…';try{const d=await req('/admin/'+kind);box.textContent=JSON.stringify(d.items||[],null,2)}catch(e){box.textContent=e.message}}
+async function runAdminTask(kind){const map={summary:'/admin/trigger-summary',compress:'/admin/trigger-compress'};$('taskResult').textContent='执行中…';try{const d=await req(map[kind],{method:'POST',body:'{}'});$('taskResult').textContent=d.ok?'完成':'失败：'+JSON.stringify(d)}catch(e){$('taskResult').textContent='失败：'+e.message}}
 function exportConfig(){const blob=new Blob([JSON.stringify(CFG,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='gateway-config.json';a.click();URL.revokeObjectURL(a.href)}
 async function importConfig(file){if(!file)return;try{const data=JSON.parse(await file.text());CFG=data;await persist()}catch(e){alert('导入失败：'+e.message)}}
 function renderChat(){ $('chatLog').innerHTML=chatMessages.map(m=>`<div class="msg"><b>${esc(m.role)}</b>${esc(m.content)}</div>`).join('');$('chatLog').scrollTop=$('chatLog').scrollHeight }
