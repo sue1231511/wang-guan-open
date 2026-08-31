@@ -47,6 +47,15 @@ async def call_llm(messages:list,max_tokens:int=4096,tools:list|None=None,extra_
                         if fn.get("arguments"):e["function"]["arguments"]+=fn["arguments"]
         record_result(cfg.get("config_id"),True,channel)
     except Exception:
-        record_result(cfg.get("config_id"),False,channel); raise
+        if cfg.get("runtime_provider"):
+            try:
+                from runtime_config import rotate_active_api_key
+                rotate_active_api_key()
+                clear_cache()
+            except Exception:
+                log.exception("runtime provider key rotation failed")
+        else:
+            record_result(cfg.get("config_id"),False,channel)
+        raise
     if not got_done:log.warning("LLM stream ended without [DONE] channel=%s",channel)
     return "".join(content).strip(),[tc_map[i] for i in sorted(tc_map)]
