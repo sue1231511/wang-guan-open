@@ -70,6 +70,26 @@ async def miniapp(_: Request):
     return FileResponse("miniapp/miniapp.html", media_type="text/html")
 
 
+async def admin_config(request: Request):
+    if not _authorized(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if request.method == "GET":
+        return JSONResponse(load_config())
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "Configuration must be an object"}, status_code=400)
+    return JSONResponse(save_config(body))
+
+
+async def admin_context_preview(request: Request):
+    if not _authorized(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return JSONResponse({"context": build_context()})
+
+
 async def chat_completions(request: Request):
     if not _authorized(request):
         return JSONResponse({"error": {"message": "Unauthorized"}}, status_code=401)
