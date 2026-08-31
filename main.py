@@ -135,8 +135,9 @@ async def telegram_webhook(request: Request):
     except Exception:
         return JSONResponse({"error": "invalid json"}, status_code=400)
     from telegram_bot import handle_update
+    from bg_executor import track_task
     import asyncio
-    asyncio.create_task(handle_update(update))
+    track_task(asyncio.create_task(handle_update(update)))
     return JSONResponse({"ok": True})
 
 
