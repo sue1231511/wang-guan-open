@@ -16,7 +16,9 @@ from free_tools import TOOL_SCHEMAS
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", force=True)
 log = logging.getLogger(__name__)
 
-API_SECRET = os.environ.get("API_SECRET", "")
+API_SECRET = os.environ.get("API_SECRET", "").strip()
+ALLOW_INSECURE_NO_SECRET = os.environ.get("ALLOW_INSECURE_NO_SECRET", "0") == "1"
+CORS_ALLOW_ORIGIN = os.environ.get("CORS_ALLOW_ORIGIN", "").strip()
 UPSTREAM_READ_TIMEOUT = int(os.environ.get("UPSTREAM_READ_TIMEOUT", "180"))
 INJECT_PUBLIC_TOOLS = os.environ.get("INJECT_PUBLIC_TOOLS", "0") == "1"
 
