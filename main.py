@@ -128,10 +128,14 @@ async def chat_completions(request: Request):
         finally:
             await client.aclose()
 
+    response_headers = {"Cache-Control": "no-cache"}
+    if CORS_ALLOW_ORIGIN:
+        response_headers["Access-Control-Allow-Origin"] = CORS_ALLOW_ORIGIN
+
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
+        headers=response_headers,
     )
 
 
