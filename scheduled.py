@@ -48,10 +48,17 @@ def run_current_memory_refresh():
         m=re.search(r'\{.*\}',raw,re.S); data=json.loads(m.group(0)) if m else {}; items=data.get("memories",[])
     except Exception:return
     if not items:return
-    delete_ids("memories",[r["id"] for r in cur if r.get("id") is not None])
+    valid=[]
     for x in items:
         c=(x.get("content") or "").strip()
-        if c: insert("memories",{"content":c,"memory_layer":"current","importance":max(1,min(int(x.get("importance",3)),5))})
+        if not c:continue
+        try: importance=max(1,min(int(x.get("importance",3)),5))
+        except Exception: importance=3
+        valid.append((c,importance))
+    if not valid:return
+    delete_ids("memories",[r["id"] for r in cur if r.get("id") is not None])
+    for c,importance in valid:
+        insert("memories",{"content":c,"memory_layer":"current","importance":importance})
 
 
 def run_thread_scan():
