@@ -1,7 +1,7 @@
 """Unified streaming OpenAI-compatible LLM caller used by bots and background tasks."""
 from __future__ import annotations
 import json, logging, httpx
-from llm_channels import get_config, record_result
+from llm_channels import get_config, record_result, clear_cache
 
 log=logging.getLogger(__name__)
 
